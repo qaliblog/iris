@@ -170,10 +170,14 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         }
         
         // Re-initialize camera if not already bound (for preview display)
+        // Service handles background processing, fragment handles preview when visible
         if (camera == null && cameraProvider != null) {
             bindCameraUseCases()
         } else if (cameraProvider == null) {
             setUpCamera()
+        } else {
+            // Camera provider exists but no camera bound - rebind
+            bindCameraUseCases()
         }
     }
     
@@ -195,32 +199,22 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             LogcatManager.addLog("App paused but keeping camera active for background tracking", "Camera")
         }
         
-        // Check if camera is still bound
-        if (camera != null) {
-            LogcatManager.addLog("Camera still bound in onPause - should continue running", "Camera")
-            // Force camera to stay active by keeping analyzer running
-            imageAnalyzer?.let {
-                LogcatManager.addLog("ImageAnalyzer still active", "Camera")
-            }
-        } else {
-            LogcatManager.addLog("WARNING: Camera not bound in onPause - may need rebinding", "Camera")
-            // Try to rebind camera if wake lock is active
-            fragmentCameraBinding?.root?.postDelayed({
-                if (!isResumed && camera == null && cameraProvider != null) {
-                    LogcatManager.addLog("Attempting to rebind camera in background", "Camera")
-                    try {
-                        val activity = activity
-                        if (activity != null && !activity.isFinishing) {
-                            bindCameraUseCases()
-                        }
-                    } catch (e: Exception) {
-                        LogcatManager.addLog("Failed to rebind camera: ${e.message}", "Camera")
-                    }
-                }
-            }, 1000)
+        // Release camera binding to let service take over for background processing
+        // Service will continue processing frames and updating pointer even when app is closed
+        if (camera != null || cameraProvider != null) {
+            LogcatManager.addLog("Releasing camera binding - service will take over for background processing", "Camera")
+            // Unbind camera use cases - service will rebind its own
+            cameraProvider?.unbindAll()
+            camera = null
+            imageAnalyzer = null
+            preview = null
+            
+            // Service will rebind camera for background processing
+            val foregroundService = CameraForegroundService.getInstance()
+            foregroundService?.rebindCameraIfNeeded()
         }
         
-        // Verify wake lock is active to keep camera running
+        // Verify wake lock is active to keep service running
         val foregroundService = CameraForegroundService.getInstance()
         if (foregroundService == null) {
             LogcatManager.addLog("WARNING: Camera foreground service not running - restarting", "Camera")
@@ -230,24 +224,24 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
                 LogcatManager.addLog("Failed to restart foreground service: ${e.message}", "Camera")
             }
         } else {
-            LogcatManager.addLog("Camera foreground service is running - wake lock active", "Camera")
+            LogcatManager.addLog("Camera foreground service is running - will handle background processing", "Camera")
         }
         
-        // Ensure pointer service is still updating
-        LogcatManager.addLog("Pointer overlay should continue updating in background", "Camera")
-        
-        // Schedule a check to see if frames are still coming after a delay
-        fragmentCameraBinding?.root?.postDelayed({
-            if (!isResumed) {
-                LogcatManager.addLog("Background check: Fragment still paused, checking if camera frames are coming", "Camera")
-                if (camera == null) {
-                    LogcatManager.addLog("WARNING: Camera became null after pause - may need rebinding", "Camera")
-                }
-            }
-        }, 5000)
+        // Ensure pointer service continues updating from background service
+        LogcatManager.addLog("Pointer overlay will continue updating from background service", "Camera")
     }
 
     override fun onDestroyView() {
+        // Release camera when view is destroyed - service will continue in background
+        cameraProvider?.unbindAll()
+        camera = null
+        imageAnalyzer = null
+        preview = null
+        
+        // Service will continue processing frames and updating pointer
+        val foregroundService = CameraForegroundService.getInstance()
+        foregroundService?.rebindCameraIfNeeded()
+        
         _fragmentCameraBinding = null
         super.onDestroyView()
 

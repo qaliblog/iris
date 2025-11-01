@@ -212,17 +212,57 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                     }
                 )
                 
-                // DON'T bind camera in service - let the fragment handle it when visible
-                // The fragment will bind Preview + ImageAnalysis when active
-                // Service only needs MediaPipe initialized, fragment handles camera binding
-                // This avoids conflicts and ensures preview is shown
-                LogcatManager.addLog("Service: MediaPipe initialized, fragment will handle camera binding", "Service")
-                Log.d(TAG, "Service initialized MediaPipe, fragment will bind camera")
+                // Bind camera in service for background processing
+                // When fragment is active, it will bind Preview + ImageAnalysis
+                // When fragment is paused/closed, service continues with ImageAnalysis only
+                // This ensures pointer updates continue even when app is in background
+                bindCameraInService()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize camera: ${e.message}", e)
                 LogcatManager.addLog("Failed to initialize camera: ${e.message}", "Service")
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+    
+    /**
+     * Bind camera in service for background processing
+     * This ensures camera processing continues even when fragment is paused/closed
+     */
+    private fun bindCameraInService() {
+        cameraProvider?.let { provider ->
+            try {
+                // Use front camera
+                val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+                
+                // Unbind all first to take control (fragment will rebind when needed)
+                provider.unbindAll()
+                
+                // Bind camera to ProcessLifecycleOwner (only ImageAnalysis for processing)
+                // ProcessLifecycleOwner keeps it running even when app is in background
+                camera = provider.bindToLifecycle(
+                    ProcessLifecycleOwner.get(),
+                    cameraSelector,
+                    imageAnalysis
+                )
+                
+                LogcatManager.addLog("Service: Camera bound for background processing", "Service")
+                Log.d(TAG, "Camera bound successfully in service for background")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to bind camera in service: ${e.message}", e)
+                LogcatManager.addLog("Failed to bind camera in service: ${e.message}", "Service")
+            }
+        } ?: run {
+            LogcatManager.addLog("Service: Camera provider not ready yet, will bind later", "Service")
+        }
+    }
+    
+    /**
+     * Rebind camera in service - called when fragment releases camera
+     */
+    fun rebindCameraIfNeeded() {
+        if (camera == null && cameraProvider != null && imageAnalysis != null) {
+            bindCameraInService()
+        }
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
