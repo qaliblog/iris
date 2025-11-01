@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.qali.ipoint.fragment
+package com.qali.iris.fragment
 
 import android.annotation.SuppressLint
 import android.accessibilityservice.AccessibilityServiceInfo
@@ -51,18 +51,18 @@ import androidx.viewpager2.widget.ViewPager2.SCROLL_STATE_DRAGGING
 import androidx.viewpager2.widget.ViewPager2.SCROLL_STATE_IDLE
 import androidx.viewpager2.widget.ViewPager2.SCROLL_STATE_SETTLING
 import androidx.viewpager2.widget.ViewPager2.ScrollState
-import com.qali.ipoint.CameraForegroundService
-import com.qali.ipoint.EyeBlinkDetector
-import com.qali.ipoint.EyeTracker
-import com.qali.ipoint.FaceLandmarkerHelper
-import com.qali.ipoint.LogcatManager
-import com.qali.ipoint.MainViewModel
-import com.qali.ipoint.MouseControlService
-import com.qali.ipoint.PointerOverlayService
-import com.qali.ipoint.R
-import com.qali.ipoint.SettingsManager
-import com.qali.ipoint.TrackingCalculator
-import com.qali.ipoint.databinding.FragmentCameraBinding
+import com.qali.iris.CameraForegroundService
+import com.qali.iris.EyeBlinkDetector
+import com.qali.iris.EyeTracker
+import com.qali.iris.FaceLandmarkerHelper
+import com.qali.iris.LogcatManager
+import com.qali.iris.MainViewModel
+import com.qali.iris.MouseControlService
+import com.qali.iris.PointerOverlayService
+import com.qali.iris.R
+import com.qali.iris.SettingsManager
+import com.qali.iris.TrackingCalculator
+import com.qali.iris.databinding.FragmentCameraBinding
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import java.util.Locale
 import java.util.Optional
@@ -277,6 +277,9 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         settingsManager = SettingsManager(requireContext())
         trackingCalculator = TrackingCalculator(settingsManager, displayMetrics)
         
+        // Set SettingsManager in MouseControlService for cursor update configuration
+        MouseControlService.getInstance()?.setSettingsManager(settingsManager)
+        
         // Initialize blink detector for click functionality with threshold from settings
         eyeBlinkDetector = EyeBlinkDetector(settingsManager.blinkThreshold)
         
@@ -286,67 +289,67 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         // Setup settings button - use FragmentManager directly instead of Navigation Component
         // Set up immediately without delay to ensure it works
         fragmentCameraBinding.settingsButton.setOnClickListener {
-                // Prevent multiple rapid clicks
-                if (isSettingsOpening) {
-                    LogcatManager.addLog("Settings opening already in progress, ignoring click", "Camera")
-                    return@setOnClickListener
-                }
-                
-                // Ensure fragment is still attached
-                if (!isAdded || !isResumed) {
-                    LogcatManager.addLog("Fragment not ready, ignoring settings click", "Camera")
-                    return@setOnClickListener
-                }
-                
-                Log.e(TAG, "=== SETTINGS BUTTON CLICKED ===")
-                LogcatManager.addLog("=== Settings button clicked ===", "Camera")
-                
-                try {
-                    // Disable cursor when opening settings
-                    CameraFragment.setCursorMovementEnabled(false)
-                    
-                    val activity = requireActivity()
-                    val fragmentManager = activity.supportFragmentManager
-                    
-                    // Check if settings fragment is already showing or in backstack
-                    val existingFragment = fragmentManager.findFragmentByTag("SettingsFragment")
-                    if (existingFragment != null && existingFragment.isVisible) {
-                        LogcatManager.addLog("Settings already visible, closing...", "Camera")
-                        fragmentManager.popBackStack("SettingsFragment", androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
-                        CameraFragment.setCursorMovementEnabled(true)
-                        return@setOnClickListener
-                    }
-                    
-                    isSettingsOpening = true
-                    LogcatManager.addLog("Opening SettingsFragment using FragmentTransaction...", "Camera")
-                    
-                    // Create and show SettingsFragment directly
-                    val settingsFragment = com.qali.ipoint.fragment.SettingsFragment()
-                    val transaction = fragmentManager.beginTransaction()
-                    
-                    // Add to the fragment_container (which contains the NavHostFragment)
-                    // We'll add it on top, not replace
-                    transaction.add(R.id.fragment_container, settingsFragment, "SettingsFragment")
-                    transaction.addToBackStack("SettingsFragment")
-                    transaction.commitAllowingStateLoss() // Use commitAllowingStateLoss to prevent IllegalStateException
-                    
-                    LogcatManager.addLog("SettingsFragment transaction committed successfully!", "Camera")
-                    Log.e(TAG, "SettingsFragment transaction committed")
-                    
-                    // Reset flag after a short delay
-                    fragmentCameraBinding.settingsButton.postDelayed({
-                        isSettingsOpening = false
-                    }, 500)
-                    
-                } catch (e: Exception) {
-                    isSettingsOpening = false
-                    CameraFragment.setCursorMovementEnabled(true)
-                    LogcatManager.addLog("Failed to open settings: ${e.message}", "Camera")
-                    Log.e(TAG, "Error opening settings", e)
-                    e.printStackTrace()
-                    Toast.makeText(requireContext(), "Failed to open settings: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
+            // Prevent multiple rapid clicks
+            if (isSettingsOpening) {
+                LogcatManager.addLog("Settings opening already in progress, ignoring click", "Camera")
+                return@setOnClickListener
             }
+            
+            // Ensure fragment is still attached
+            if (!isAdded || !isResumed) {
+                LogcatManager.addLog("Fragment not ready, ignoring settings click", "Camera")
+                return@setOnClickListener
+            }
+            
+            Log.e(TAG, "=== SETTINGS BUTTON CLICKED ===")
+            LogcatManager.addLog("=== Settings button clicked ===", "Camera")
+            
+            try {
+                // Disable cursor when opening settings
+                CameraFragment.setCursorMovementEnabled(false)
+                
+                val activity = requireActivity()
+                val fragmentManager = activity.supportFragmentManager
+                
+                // Check if settings fragment is already showing or in backstack
+                val existingFragment = fragmentManager.findFragmentByTag("SettingsFragment")
+                if (existingFragment != null && existingFragment.isVisible) {
+                    LogcatManager.addLog("Settings already visible, closing...", "Camera")
+                    fragmentManager.popBackStack("SettingsFragment", androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+                    CameraFragment.setCursorMovementEnabled(true)
+                    return@setOnClickListener
+                }
+                
+                isSettingsOpening = true
+                LogcatManager.addLog("Opening SettingsFragment using FragmentTransaction...", "Camera")
+                
+                // Create and show SettingsFragment directly
+                val settingsFragment = com.qali.iris.fragment.SettingsFragment()
+                val transaction = fragmentManager.beginTransaction()
+                
+                // Add to the fragment_container (which contains the NavHostFragment)
+                // We'll add it on top, not replace
+                transaction.add(R.id.fragment_container, settingsFragment, "SettingsFragment")
+                transaction.addToBackStack("SettingsFragment")
+                transaction.commitAllowingStateLoss() // Use commitAllowingStateLoss to prevent IllegalStateException
+                
+                LogcatManager.addLog("SettingsFragment transaction committed successfully!", "Camera")
+                Log.e(TAG, "SettingsFragment transaction committed")
+                
+                // Reset flag after a short delay
+                fragmentCameraBinding.settingsButton.postDelayed({
+                    isSettingsOpening = false
+                }, 500)
+                
+            } catch (e: Exception) {
+                isSettingsOpening = false
+                CameraFragment.setCursorMovementEnabled(true)
+                LogcatManager.addLog("Failed to open settings: ${e.message}", "Camera")
+                Log.e(TAG, "Error opening settings", e)
+                e.printStackTrace()
+                Toast.makeText(requireContext(), "Failed to open settings: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
         
         LogcatManager.addLog("Settings button click listener set up", "Camera")
         Log.e(TAG, "Settings button click listener set up")

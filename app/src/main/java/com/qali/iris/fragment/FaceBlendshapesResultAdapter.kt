@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.qali.ipoint.fragment
+package com.qali.iris.fragment
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.qali.ipoint.databinding.FaceBlendshapesResultBinding
+import com.qali.iris.databinding.FaceBlendshapesResultBinding
 import com.google.mediapipe.tasks.components.containers.Category
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 

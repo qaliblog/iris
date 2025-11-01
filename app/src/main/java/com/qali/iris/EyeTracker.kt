@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 import android.graphics.PointF
 import android.util.DisplayMetrics

@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 /*
  * Copyright 2023 The TensorFlow Authors. All Rights Reserved.
  *

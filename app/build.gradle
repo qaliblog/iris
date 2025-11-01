@@ -20,11 +20,11 @@ plugins {
 }
 
 android {
-    namespace 'com.qali.ipoint'
+    namespace 'com.qali.iris'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.qali.ipoint"
+        applicationId "com.qali.iris"
         minSdk 24
         targetSdk 34
         versionCode 1

@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -58,8 +58,26 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_USE_ONE_EYE, false)
         set(value) = prefs.edit().putBoolean(KEY_USE_ONE_EYE, value).apply()
     
+    // Cursor smoothing factor (0.0-1.0, default 0.7)
+    // Higher values = more smoothing (slower response), lower = more responsive
+    var cursorSmoothingFactor: Float
+        get() = prefs.getFloat(KEY_CURSOR_SMOOTHING, 0.7f)
+        set(value) = prefs.edit().putFloat(KEY_CURSOR_SMOOTHING, value.coerceIn(0f, 1f)).apply()
+    
+    // Cursor update interval in milliseconds (default 16ms = ~60fps)
+    // Lower = more frequent updates (smoother), higher = less frequent (better performance)
+    var cursorUpdateInterval: Long
+        get() = prefs.getLong(KEY_CURSOR_UPDATE_INTERVAL, 16L)
+        set(value) = prefs.edit().putLong(KEY_CURSOR_UPDATE_INTERVAL, value.coerceIn(8L, 100L)).apply()
+    
+    // Cursor movement duration for gesture (default 100ms)
+    // Lower = faster movement, higher = slower/smoother gesture
+    var cursorMovementDuration: Long
+        get() = prefs.getLong(KEY_CURSOR_MOVEMENT_DURATION, 100L)
+        set(value) = prefs.edit().putLong(KEY_CURSOR_MOVEMENT_DURATION, value.coerceIn(50L, 300L)).apply()
+    
     companion object {
-        private const val PREFS_NAME = "ipoint_settings"
+        private const val PREFS_NAME = "iris_settings"
         
         private const val KEY_X_MOVEMENT_MULTIPLIER = "x_movement_multiplier"
         private const val KEY_Y_MOVEMENT_MULTIPLIER = "y_movement_multiplier"
@@ -71,5 +89,8 @@ class SettingsManager(context: Context) {
         private const val KEY_DISTANCE_Y_MULTIPLIER = "distance_y_multiplier"
         private const val KEY_BLINK_THRESHOLD = "blink_threshold"
         private const val KEY_USE_ONE_EYE = "use_one_eye"
+        private const val KEY_CURSOR_SMOOTHING = "cursor_smoothing"
+        private const val KEY_CURSOR_UPDATE_INTERVAL = "cursor_update_interval"
+        private const val KEY_CURSOR_MOVEMENT_DURATION = "cursor_movement_duration"
     }
 }

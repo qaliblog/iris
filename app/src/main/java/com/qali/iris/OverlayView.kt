@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 import android.content.Context
 import android.graphics.Canvas

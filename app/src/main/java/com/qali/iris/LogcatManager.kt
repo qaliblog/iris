@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -16,7 +16,7 @@ object LogcatManager {
     private val logBuffer = Collections.synchronizedList(mutableListOf<String>())
     private val listeners = mutableListOf<(String) -> Unit>()
     
-    fun addLog(message: String, tag: String = "iPoint") {
+    fun addLog(message: String, tag: String = "iris") {
         val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
         val logLine = "[$timestamp] [$tag] $message"
         

@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -15,7 +15,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.core.app.NotificationCompat
-import com.qali.ipoint.PointerView
+import com.qali.iris.PointerView
 
 /**
  * Service that displays a floating pointer overlay on top of all apps
@@ -87,7 +87,7 @@ class PointerOverlayService : Service() {
     
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("iPoint Pointer")
+            .setContentTitle("iris Pointer")
             .setContentText("Pointer overlay is active")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)

@@ -21,7 +21,7 @@
 
     <fragment
         android:id="@+id/permissions_fragment"
-        android:name="com.qali.ipoint.fragment.PermissionsFragment"
+        android:name="com.qali.iris.fragment.PermissionsFragment"
         android:label="PermissionsFragment">
 
         <action
@@ -34,7 +34,7 @@
 
     <fragment
         android:id="@+id/camera_fragment"
-        android:name="com.qali.ipoint.fragment.CameraFragment"
+        android:name="com.qali.iris.fragment.CameraFragment"
         android:label="CameraFragment">
 
         <action
@@ -50,12 +50,12 @@
 
     <fragment
         android:id="@+id/gallery_fragment"
-        android:name="com.qali.ipoint.fragment.GalleryFragment"
+        android:name="com.qali.iris.fragment.GalleryFragment"
         android:label="GalleryFragment" />
 
     <fragment
         android:id="@+id/settings_fragment"
-        android:name="com.qali.ipoint.fragment.SettingsFragment"
+        android:name="com.qali.iris.fragment.SettingsFragment"
         android:label="Settings">
 
         <action

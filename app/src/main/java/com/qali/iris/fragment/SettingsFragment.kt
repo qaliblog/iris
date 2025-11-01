@@ -1,4 +1,4 @@
-package com.qali.ipoint.fragment
+package com.qali.iris.fragment
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -15,11 +15,11 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import com.qali.ipoint.LogcatManager
-import com.qali.ipoint.R
-import com.qali.ipoint.SettingsManager
-import com.qali.ipoint.databinding.FragmentSettingsBinding
-import com.qali.ipoint.fragment.CameraFragment
+import com.qali.iris.LogcatManager
+import com.qali.iris.R
+import com.qali.iris.SettingsManager
+import com.qali.iris.databinding.FragmentSettingsBinding
+import com.qali.iris.fragment.CameraFragment
 import java.text.DecimalFormat
 import java.util.Locale
 
@@ -102,6 +102,7 @@ class SettingsFragment : Fragment() {
         setupDistanceMultipliers()
         setupWakeLockToggle()
         setupBlinkDetection()
+        setupCursorUpdateSettings()
         setupPermissions()
     }
     
@@ -113,7 +114,7 @@ class SettingsFragment : Fragment() {
         
         // Update wake lock toggle state in case it changed
         _binding?.let {
-            val isEnabled = com.qali.ipoint.CameraForegroundService.getWakeLockState()
+            val isEnabled = com.qali.iris.CameraForegroundService.getWakeLockState()
             val switch = it.root.findViewById<android.widget.Switch>(R.id.wake_lock_toggle)
             switch?.isChecked = isEnabled
         }
@@ -229,7 +230,7 @@ class SettingsFragment : Fragment() {
                                 return@post
                             }
                             
-                            val clip = ClipData.newPlainText("iPoint Logcat", logText)
+                            val clip = ClipData.newPlainText("iris Logcat", logText)
                             clipboard.setPrimaryClip(clip)
                             
                             // Show toast on main thread
@@ -467,7 +468,10 @@ class SettingsFragment : Fragment() {
                         binding.eyePosYMultValue,
                         binding.distanceXValue,
                         binding.distanceYValue,
-                        binding.blinkThresholdValue
+                        binding.blinkThresholdValue,
+                        binding.cursorSmoothingValue,
+                        binding.cursorUpdateIntervalValue,
+                        binding.cursorMovementDurationValue
                     ).any { editText -> editText.isFocused }
                     
                     // Don't re-enable cursor movement - it stays disabled while settings are open
@@ -609,18 +613,18 @@ class SettingsFragment : Fragment() {
     
     private fun setupWakeLockToggle() {
         // Get current wake lock state
-        val isEnabled = com.qali.ipoint.CameraForegroundService.getWakeLockState()
+        val isEnabled = com.qali.iris.CameraForegroundService.getWakeLockState()
         val wakeLockSwitch = binding.root.findViewById<android.widget.Switch>(R.id.wake_lock_toggle)
         wakeLockSwitch?.isChecked = isEnabled
         
         wakeLockSwitch?.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 // Enable wake lock via service
-                val service = com.qali.ipoint.CameraForegroundService.getInstance()
+                val service = com.qali.iris.CameraForegroundService.getInstance()
                 if (service == null) {
                     // Start service if not running
                     try {
-                        com.qali.ipoint.CameraForegroundService.start(requireContext())
+                        com.qali.iris.CameraForegroundService.start(requireContext())
                         LogcatManager.addLog("Wake lock service started", "Settings")
                     } catch (e: Exception) {
                         LogcatManager.addLog("Failed to start wake lock: ${e.message}", "Settings")
@@ -629,13 +633,13 @@ class SettingsFragment : Fragment() {
                 } else {
                     // Toggle wake lock on
                     if (!service.isWakeLockEnabled) {
-                        com.qali.ipoint.CameraForegroundService.toggleWakeLock()
+                        com.qali.iris.CameraForegroundService.toggleWakeLock()
                     }
                     LogcatManager.addLog("Wake lock enabled - MediaPipe will continue processing", "Settings")
                 }
             } else {
                 // Disable wake lock
-                com.qali.ipoint.CameraForegroundService.toggleWakeLock()
+                com.qali.iris.CameraForegroundService.toggleWakeLock()
                 LogcatManager.addLog("Wake lock disabled - MediaPipe may pause when device sleeps", "Settings")
             }
         }
@@ -678,6 +682,83 @@ class SettingsFragment : Fragment() {
         oneEyeSwitch?.setOnCheckedChangeListener { _, isChecked ->
             settingsManager.useOneEyeDetection = isChecked
             LogcatManager.addLog("One eye detection: ${if (isChecked) "enabled" else "disabled"}", "Settings")
+        }
+    }
+    
+    private fun setupCursorUpdateSettings() {
+        // Setup cursor smoothing
+        setupValueEditor(
+            binding.cursorSmoothingValue,
+            { settingsManager.cursorSmoothingFactor },
+            { settingsManager.cursorSmoothingFactor = it },
+            "Cursor Smoothing",
+            0.05f
+        )
+        
+        binding.cursorSmoothingMinus.setOnClickListener {
+            binding.cursorSmoothingValue.clearFocus()
+            val newValue = (settingsManager.cursorSmoothingFactor - 0.05f).coerceIn(0f, 1f)
+            settingsManager.cursorSmoothingFactor = newValue
+            updateValue(binding.cursorSmoothingValue, newValue)
+            LogcatManager.addLog("Cursor Smoothing: ${df.format(newValue)} (0=responsive, 1=smooth)", "Settings")
+        }
+        
+        binding.cursorSmoothingPlus.setOnClickListener {
+            binding.cursorSmoothingValue.clearFocus()
+            val newValue = (settingsManager.cursorSmoothingFactor + 0.05f).coerceIn(0f, 1f)
+            settingsManager.cursorSmoothingFactor = newValue
+            updateValue(binding.cursorSmoothingValue, newValue)
+            LogcatManager.addLog("Cursor Smoothing: ${df.format(newValue)}", "Settings")
+        }
+        
+        // Setup cursor update interval
+        setupValueEditor(
+            binding.cursorUpdateIntervalValue,
+            { settingsManager.cursorUpdateInterval.toFloat() },
+            { settingsManager.cursorUpdateInterval = it.toLong() },
+            "Cursor Update Interval",
+            4f
+        )
+        
+        binding.cursorUpdateIntervalMinus.setOnClickListener {
+            binding.cursorUpdateIntervalValue.clearFocus()
+            val newValue = (settingsManager.cursorUpdateInterval - 4).coerceIn(8L, 100L)
+            settingsManager.cursorUpdateInterval = newValue
+            updateValue(binding.cursorUpdateIntervalValue, newValue.toFloat())
+            LogcatManager.addLog("Update Interval: ${newValue}ms (~${1000/newValue}fps)", "Settings")
+        }
+        
+        binding.cursorUpdateIntervalPlus.setOnClickListener {
+            binding.cursorUpdateIntervalValue.clearFocus()
+            val newValue = (settingsManager.cursorUpdateInterval + 4).coerceIn(8L, 100L)
+            settingsManager.cursorUpdateInterval = newValue
+            updateValue(binding.cursorUpdateIntervalValue, newValue.toFloat())
+            LogcatManager.addLog("Update Interval: ${newValue}ms (~${1000/newValue}fps)", "Settings")
+        }
+        
+        // Setup cursor movement duration
+        setupValueEditor(
+            binding.cursorMovementDurationValue,
+            { settingsManager.cursorMovementDuration.toFloat() },
+            { settingsManager.cursorMovementDuration = it.toLong() },
+            "Cursor Movement Duration",
+            10f
+        )
+        
+        binding.cursorMovementDurationMinus.setOnClickListener {
+            binding.cursorMovementDurationValue.clearFocus()
+            val newValue = (settingsManager.cursorMovementDuration - 10).coerceIn(50L, 300L)
+            settingsManager.cursorMovementDuration = newValue
+            updateValue(binding.cursorMovementDurationValue, newValue.toFloat())
+            LogcatManager.addLog("Movement Duration: ${newValue}ms", "Settings")
+        }
+        
+        binding.cursorMovementDurationPlus.setOnClickListener {
+            binding.cursorMovementDurationValue.clearFocus()
+            val newValue = (settingsManager.cursorMovementDuration + 10).coerceIn(50L, 300L)
+            settingsManager.cursorMovementDuration = newValue
+            updateValue(binding.cursorMovementDurationValue, newValue.toFloat())
+            LogcatManager.addLog("Movement Duration: ${newValue}ms", "Settings")
         }
     }
     

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.qali.ipoint
+package com.qali.iris
 
 import android.content.Context
 import android.graphics.Bitmap

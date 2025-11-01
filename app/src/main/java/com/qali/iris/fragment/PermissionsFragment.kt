@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.qali.ipoint.fragment
+package com.qali.iris.fragment
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -25,7 +25,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
-import com.qali.ipoint.R
+import com.qali.iris.R
 
 private val PERMISSIONS_REQUIRED = arrayOf(Manifest.permission.CAMERA)
 

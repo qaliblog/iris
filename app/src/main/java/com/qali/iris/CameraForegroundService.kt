@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -20,7 +20,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.mediapipe.tasks.vision.core.RunningMode
-import com.qali.ipoint.fragment.CameraFragment
+import com.qali.iris.fragment.CameraFragment
 import java.util.concurrent.Executors
 
 /**
@@ -33,7 +33,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         private const val TAG = "CameraForegroundService"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "camera_foreground_channel"
-        const val ACTION_TOGGLE_WAKELOCK = "com.qali.ipoint.TOGGLE_WAKELOCK"
+        const val ACTION_TOGGLE_WAKELOCK = "com.qali.iris.TOGGLE_WAKELOCK"
         private var instance: CameraForegroundService? = null
         
         fun getInstance(): CameraForegroundService? = instance
@@ -101,7 +101,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-            "iPoint::CameraForegroundWakeLock"
+            "iris::CameraForegroundWakeLock"
         ).apply {
             setReferenceCounted(false)
             try {
@@ -120,6 +120,9 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         eyeTracker = EyeTracker(displayMetrics!!, settingsManager!!.useOneEyeDetection)
         trackingCalculator = TrackingCalculator(settingsManager!!, displayMetrics!!)
         eyeBlinkDetector = EyeBlinkDetector(settingsManager!!.blinkThreshold)
+        
+        // Set SettingsManager in MouseControlService for cursor update configuration
+        MouseControlService.getInstance()?.setSettingsManager(settingsManager!!)
         
         // Start pointer overlay service
         try {
@@ -374,7 +377,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         }
         
         val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("?? iPoint - Wake Lock: $wakeLockStatus")
+            .setContentTitle("?? iris - Wake Lock: $wakeLockStatus")
             .setContentText(if (isWakeLockEnabled) "Wake lock ON ? Camera active ? MediaPipe running" else "Wake lock OFF ? Camera may pause")
             .setSmallIcon(android.R.drawable.ic_lock_power_off)
             .setContentIntent(pendingIntent)
@@ -421,7 +424,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
                 wakeLock = powerManager.newWakeLock(
                     PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                    "iPoint::CameraForegroundWakeLock"
+                    "iris::CameraForegroundWakeLock"
                 ).apply {
                     setReferenceCounted(false)
                     try {

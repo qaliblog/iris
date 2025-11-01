@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.qali.ipoint.fragment
+package com.qali.iris.fragment
 
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -33,9 +33,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
-import com.qali.ipoint.FaceLandmarkerHelper
-import com.qali.ipoint.MainViewModel
-import com.qali.ipoint.databinding.FragmentGalleryBinding
+import com.qali.iris.FaceLandmarkerHelper
+import com.qali.iris.MainViewModel
+import com.qali.iris.databinding.FragmentGalleryBinding
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import java.util.Locale
 import java.util.concurrent.Executors

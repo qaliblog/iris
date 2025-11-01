@@ -28,5 +28,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "ipoint"
+rootProject.name = "iris"
 include ':app'

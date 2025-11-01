@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.qali.ipoint
+package com.qali.iris
 
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import com.qali.ipoint.CameraForegroundService
-import com.qali.ipoint.databinding.ActivityMainBinding
+import com.qali.iris.CameraForegroundService
+import com.qali.iris.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
     private lateinit var activityMainBinding: ActivityMainBinding

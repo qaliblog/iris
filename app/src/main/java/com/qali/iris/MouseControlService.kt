@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 import android.accessibilityservice.AccessibilityService
 import android.graphics.PixelFormat
@@ -32,7 +32,20 @@ class MouseControlService : AccessibilityService() {
     
     private var lastX: Float = 0f
     private var lastY: Float = 0f
-    private val smoothingFactor = 0.7f // Smoothing factor for cursor movement
+    private var lastUpdateTime: Long = 0
+    private var settingsManager: SettingsManager? = null
+    
+    fun setSettingsManager(settingsManager: SettingsManager) {
+        this.settingsManager = settingsManager
+    }
+    
+    private fun getSmoothingFactor(): Float {
+        return settingsManager?.cursorSmoothingFactor ?: 0.7f
+    }
+    
+    private fun getMovementDuration(): Long {
+        return settingsManager?.cursorMovementDuration ?: 100L
+    }
     
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -68,6 +81,17 @@ class MouseControlService : AccessibilityService() {
                 return
             }
             
+            val currentTime = System.currentTimeMillis()
+            val smoothingFactor = getSmoothingFactor()
+            val movementDuration = getMovementDuration()
+            
+            // Apply update interval throttling if configured
+            val updateInterval = settingsManager?.cursorUpdateInterval ?: 16L
+            if (lastUpdateTime > 0 && (currentTime - lastUpdateTime) < updateInterval) {
+                return // Skip this update if too soon
+            }
+            lastUpdateTime = currentTime
+            
             // Smooth the movement
             val smoothedX = if (lastX == 0f && lastY == 0f) x else lastX + (x - lastX) * (1 - smoothingFactor)
             val smoothedY = if (lastX == 0f && lastY == 0f) y else lastY + (y - lastY) * (1 - smoothingFactor)
@@ -87,7 +111,7 @@ class MouseControlService : AccessibilityService() {
                     android.accessibilityservice.GestureDescription.StrokeDescription(
                         path,
                         0,
-                        100 // Duration for movement
+                        movementDuration // Duration for movement (configurable)
                     )
                 )
                 .build()

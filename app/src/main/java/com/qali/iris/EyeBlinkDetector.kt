@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 /**
  * Detects eye blinks (rapid close-open pattern) for click functionality

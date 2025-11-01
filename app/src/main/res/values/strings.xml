@@ -15,7 +15,7 @@
     ~ limitations under the License.
 -->
 <resources>
-    <string name="app_name">ipoint</string>
+    <string name="app_name">iris</string>
 
     <string name="media_pipe">MediaPipe</string>
 
@@ -50,5 +50,6 @@
         <item>GPU</item>
     </string-array>
 
-    <string name="accessibility_service_description">Enable mouse control using eye tracking. This service allows the app to control the cursor on your device.</string>
+    <string name="accessibility_service_description">Enable mouse control using eye tracking. This service allows iris to control the cursor on your device.</string>
 </resources>
+

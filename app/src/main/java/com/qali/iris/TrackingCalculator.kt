@@ -1,4 +1,4 @@
-package com.qali.ipoint
+package com.qali.iris
 
 /**
  * Calculates final screen coordinates with all adjustments applied
