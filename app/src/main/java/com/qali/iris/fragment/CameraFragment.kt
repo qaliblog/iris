@@ -545,9 +545,16 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
                     }
                 }
 
-        // Unbind all to ensure clean state (service will rebind its own use cases if needed)
+        // Unbind all to ensure clean state
         // The fragment needs Preview + ImageAnalysis for display + processing
+        // Service will rebind its own ImageAnalysis when fragment releases
         cameraProvider.unbindAll()
+        
+        // Notify service that fragment is taking camera control
+        CameraForegroundService.getInstance()?.let { service ->
+            // Service will release its binding if needed
+            LogcatManager.addLog("Fragment taking camera control - service will release", "Camera")
+        }
 
         try {
             // Bind camera to ProcessLifecycleOwner to keep it running even when activity pauses
