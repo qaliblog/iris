@@ -175,9 +175,11 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 cameraProvider = cameraProviderFuture.get()
                 
                 // Build image analysis use case
+                // Must use RGBA_8888 format to match MediaPipe FaceLandmarkerHelper requirements
                 imageAnalysis = ImageAnalysis.Builder()
                     .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
                 
                 // Set analyzer
@@ -210,38 +212,12 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                     }
                 )
                 
-                // Only bind camera in service if fragment is not active (handles preview)
-                // The fragment should handle camera preview and processing when visible
-                // Service only takes over when app is completely in background
-                // Check if fragment camera is already bound
-                val shouldBindInService = true // For now, allow both - fragment will handle preview
-                
-                if (shouldBindInService) {
-                    cameraProvider?.let { provider ->
-                        // Use front camera
-                        val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-                        
-                        // Unbind all first to ensure clean state
-                        // Fragment will rebind Preview when visible
-                        provider.unbindAll()
-                        
-                        // Bind camera to ProcessLifecycleOwner (only ImageAnalysis for processing)
-                        // Note: Fragment will bind Preview separately for UI display
-                        try {
-                            camera = provider.bindToLifecycle(
-                                ProcessLifecycleOwner.get(),
-                                cameraSelector,
-                                imageAnalysis
-                            )
-                            
-                            LogcatManager.addLog("Camera initialized in background service (processing only)", "Service")
-                            Log.d(TAG, "Camera bound successfully in service")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to bind camera in service: ${e.message}", e)
-                            LogcatManager.addLog("Failed to bind camera in service: ${e.message}", "Service")
-                        }
-                    }
-                }
+                // DON'T bind camera in service - let the fragment handle it when visible
+                // The fragment will bind Preview + ImageAnalysis when active
+                // Service only needs MediaPipe initialized, fragment handles camera binding
+                // This avoids conflicts and ensures preview is shown
+                LogcatManager.addLog("Service: MediaPipe initialized, fragment will handle camera binding", "Service")
+                Log.d(TAG, "Service initialized MediaPipe, fragment will bind camera")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize camera: ${e.message}", e)
                 LogcatManager.addLog("Failed to initialize camera: ${e.message}", "Service")
