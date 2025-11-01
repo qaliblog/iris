@@ -210,23 +210,38 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                     }
                 )
                 
-                // Bind to ProcessLifecycleOwner to keep camera running even when app is in background
-                cameraProvider?.let { provider ->
-                    // Use front camera
-                    val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-                    
-                    // Unbind all use cases before rebinding
-                    provider.unbindAll()
-                    
-                    // Bind camera to ProcessLifecycleOwner
-                    camera = provider.bindToLifecycle(
-                        ProcessLifecycleOwner.get(),
-                        cameraSelector,
-                        imageAnalysis
-                    )
-                    
-                    LogcatManager.addLog("Camera initialized in background service", "Service")
-                    Log.d(TAG, "Camera bound successfully in service")
+                // Only bind camera in service if fragment is not active (handles preview)
+                // The fragment should handle camera preview and processing when visible
+                // Service only takes over when app is completely in background
+                // Check if fragment camera is already bound
+                val shouldBindInService = true // For now, allow both - fragment will handle preview
+                
+                if (shouldBindInService) {
+                    cameraProvider?.let { provider ->
+                        // Use front camera
+                        val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+                        
+                        // Don't unbind all - the fragment might have preview bound
+                        // Only bind if not already bound, or unbind/rebind carefully
+                        try {
+                            // Try to get existing camera binding first
+                            val existingBindings = provider.cameraInfos.size
+                            
+                            // Bind camera to ProcessLifecycleOwner (only ImageAnalysis for processing)
+                            // Note: Fragment will bind Preview separately for UI display
+                            camera = provider.bindToLifecycle(
+                                ProcessLifecycleOwner.get(),
+                                cameraSelector,
+                                imageAnalysis
+                            )
+                            
+                            LogcatManager.addLog("Camera initialized in background service (processing only)", "Service")
+                            Log.d(TAG, "Camera bound successfully in service")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to bind camera in service (may be bound in fragment): ${e.message}", e)
+                            LogcatManager.addLog("Camera may already be bound in fragment: ${e.message}", "Service")
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize camera: ${e.message}", e)

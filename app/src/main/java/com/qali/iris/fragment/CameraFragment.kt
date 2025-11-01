@@ -168,6 +168,13 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
                 }
             }
         }
+        
+        // Re-initialize camera if not already bound (for preview display)
+        if (camera == null && cameraProvider != null) {
+            bindCameraUseCases()
+        } else if (cameraProvider == null) {
+            setUpCamera()
+        }
     }
     
     override fun onPause() {
@@ -382,13 +389,24 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         
         // Initialize logging
         LogcatManager.addLog("CameraFragment initialized", "Camera")
-
-        // DON'T initialize camera here - the service handles all camera operations
-        // Only show preview if service is running (optional, for UI feedback)
-        // The background service will handle all camera processing and cursor updates
         
         // Initialize background executor for any fragment-specific tasks
         backgroundExecutor = Executors.newSingleThreadExecutor()
+        
+        // Initialize FaceLandmarkerHelper for MediaPipe
+        faceLandmarkerHelper = FaceLandmarkerHelper(
+            context = requireContext(),
+            runningMode = RunningMode.LIVE_STREAM,
+            minFaceDetectionConfidence = viewModel.currentMinFaceDetectionConfidence,
+            minFaceTrackingConfidence = viewModel.currentMinFaceTrackingConfidence,
+            minFacePresenceConfidence = viewModel.currentMinFacePresenceConfidence,
+            maxNumFaces = viewModel.currentMaxFaces,
+            currentDelegate = viewModel.currentDelegate,
+            faceLandmarkerHelperListener = this
+        )
+        
+        // Initialize camera for preview (service handles processing, but we need preview for UI)
+        setUpCamera()
     }
     
     private fun requestOverlayPermission() {
@@ -533,7 +551,8 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
                     }
                 }
 
-        // Must unbind the use-cases before rebinding them
+        // Unbind all to ensure clean state (service will rebind its own use cases if needed)
+        // The fragment needs Preview + ImageAnalysis for display + processing
         cameraProvider.unbindAll()
 
         try {
