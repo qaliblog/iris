@@ -221,14 +221,13 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                         // Use front camera
                         val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                         
-                        // Don't unbind all - the fragment might have preview bound
-                        // Only bind if not already bound, or unbind/rebind carefully
+                        // Unbind all first to ensure clean state
+                        // Fragment will rebind Preview when visible
+                        provider.unbindAll()
+                        
+                        // Bind camera to ProcessLifecycleOwner (only ImageAnalysis for processing)
+                        // Note: Fragment will bind Preview separately for UI display
                         try {
-                            // Try to get existing camera binding first
-                            val existingBindings = provider.cameraInfos.size
-                            
-                            // Bind camera to ProcessLifecycleOwner (only ImageAnalysis for processing)
-                            // Note: Fragment will bind Preview separately for UI display
                             camera = provider.bindToLifecycle(
                                 ProcessLifecycleOwner.get(),
                                 cameraSelector,
@@ -238,8 +237,8 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                             LogcatManager.addLog("Camera initialized in background service (processing only)", "Service")
                             Log.d(TAG, "Camera bound successfully in service")
                         } catch (e: Exception) {
-                            Log.e(TAG, "Failed to bind camera in service (may be bound in fragment): ${e.message}", e)
-                            LogcatManager.addLog("Camera may already be bound in fragment: ${e.message}", "Service")
+                            Log.e(TAG, "Failed to bind camera in service: ${e.message}", e)
+                            LogcatManager.addLog("Failed to bind camera in service: ${e.message}", "Service")
                         }
                     }
                 }
