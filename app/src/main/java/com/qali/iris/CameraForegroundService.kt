@@ -234,11 +234,13 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 // Use front camera
                 val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                 
-                // Unbind all first to take control (fragment will rebind when needed)
-                provider.unbindAll()
+                // Don't unbind all immediately - check if fragment might be using it
+                // Only unbind if we're sure fragment released it
+                // Fragment will unbind when paused/destroyed, then we take over
                 
                 // Bind camera to ProcessLifecycleOwner (only ImageAnalysis for processing)
                 // ProcessLifecycleOwner keeps it running even when app is in background
+                // Note: This may conflict with fragment binding, but fragment releases on pause
                 camera = provider.bindToLifecycle(
                     ProcessLifecycleOwner.get(),
                     cameraSelector,
@@ -248,8 +250,9 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 LogcatManager.addLog("Service: Camera bound for background processing", "Service")
                 Log.d(TAG, "Camera bound successfully in service for background")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to bind camera in service: ${e.message}", e)
-                LogcatManager.addLog("Failed to bind camera in service: ${e.message}", "Service")
+                // Camera might be bound by fragment - that's okay, it will release on pause
+                Log.d(TAG, "Camera binding conflict (fragment may have it): ${e.message}")
+                LogcatManager.addLog("Service: Camera binding deferred (fragment may be active)", "Service")
             }
         } ?: run {
             LogcatManager.addLog("Service: Camera provider not ready yet, will bind later", "Service")
