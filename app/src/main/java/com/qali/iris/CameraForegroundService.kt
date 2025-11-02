@@ -190,8 +190,8 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                             // Log periodically to confirm frames are being processed
                             val now = System.currentTimeMillis()
                             if (now % 5000 < 100) { // Log every 5 seconds
-                                LogcatManager.addLog("Service: Processing camera frame - MediaPipe active", "Service")
-                                Log.d(TAG, "Processing camera frame in background service")
+                                LogcatManager.addLog("Service: Processing camera frame - MediaPipe active | Camera bound: ${camera != null}", "Service")
+                                Log.d(TAG, "Processing camera frame in background service - Camera: ${camera != null}")
                             }
                             
                             // Update settings dynamically
@@ -216,7 +216,17 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 // When fragment is active, it will bind Preview + ImageAnalysis
                 // When fragment is paused/closed, service continues with ImageAnalysis only
                 // This ensures pointer updates continue even when app is in background
+                // Try to bind immediately, but it might fail if fragment has it (that's OK)
                 bindCameraInService()
+                
+                // Also schedule a delayed rebind attempt in case fragment has the camera
+                // This ensures we get the camera when fragment releases it
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    if (camera == null && cameraProvider != null && imageAnalysis != null) {
+                        Log.d(TAG, "Attempting delayed camera rebind in service")
+                        bindCameraInService()
+                    }
+                }, 1000)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize camera: ${e.message}", e)
                 LogcatManager.addLog("Failed to initialize camera: ${e.message}", "Service")
@@ -247,8 +257,14 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                     imageAnalysis
                 )
                 
-                LogcatManager.addLog("Service: Camera bound for background processing", "Service")
-                Log.d(TAG, "Camera bound successfully in service for background")
+                LogcatManager.addLog("Service: Camera bound for background processing - Camera instance: ${camera != null}", "Service")
+                Log.d(TAG, "Camera bound successfully in service for background - Camera: ${camera != null}")
+                
+                // Verify we actually have a camera instance
+                if (camera == null) {
+                    Log.w(TAG, "Warning: Camera binding returned null - camera may be in use by fragment")
+                    LogcatManager.addLog("Service: Warning - Camera binding returned null", "Service")
+                }
             } catch (e: Exception) {
                 // Camera might be bound by fragment - that's okay, it will release on pause
                 Log.d(TAG, "Camera binding conflict (fragment may have it): ${e.message}")
@@ -263,8 +279,15 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
      * Rebind camera in service - called when fragment releases camera
      */
     fun rebindCameraIfNeeded() {
-        if (camera == null && cameraProvider != null && imageAnalysis != null) {
-            bindCameraInService()
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            if (camera == null && cameraProvider != null && imageAnalysis != null) {
+                Log.d(TAG, "Rebinding camera in service after fragment release")
+                LogcatManager.addLog("Service: Rebinding camera for background processing", "Service")
+                bindCameraInService()
+            } else {
+                Log.d(TAG, "Cannot rebind camera - camera: ${camera != null}, provider: ${cameraProvider != null}, analyzer: ${imageAnalysis != null}")
+                LogcatManager.addLog("Service: Cannot rebind camera (camera=${camera != null}, provider=${cameraProvider != null})", "Service")
+            }
         }
     }
     
@@ -340,18 +363,16 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             val (adjustedX, adjustedY) = trackingCalculator?.calculateAdjustedPosition(trackingResult)
                 ?: Pair(trackingResult.screenX, trackingResult.screenY)
             
-            // Update pointer and mouse cursor (only if cursor movement is enabled)
-            if (CameraFragment.isCursorMovementEnabled()) {
-                PointerOverlayService.updatePointerPosition(adjustedX, adjustedY)
-                MouseControlService.moveCursor(adjustedX, adjustedY)
-                
-                // Log periodically to confirm cursor updates (every 3 seconds)
-                val now = System.currentTimeMillis()
-                if (now % 3000 < 100) {
-                    LogcatManager.addLog("Service: Cursor updated to (${adjustedX.toInt()}, ${adjustedY.toInt()})", "Service")
-                }
-            } else {
-                PointerOverlayService.getInstance()?.hidePointer()
+            // Service always updates pointer in background (regardless of cursor movement flag)
+            // The flag is only for fragment UI when settings are open
+            // In background, we always want the pointer to update
+            PointerOverlayService.updatePointerPosition(adjustedX, adjustedY)
+            MouseControlService.moveCursor(adjustedX, adjustedY)
+            
+            // Log periodically to confirm cursor updates (every 3 seconds)
+            val now = System.currentTimeMillis()
+            if (now % 3000 < 100) {
+                LogcatManager.addLog("Service: Cursor updated to (${adjustedX.toInt()}, ${adjustedY.toInt()}) | Camera: ${camera != null}", "Service")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing results: ${e.message}", e)
