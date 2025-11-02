@@ -171,13 +171,21 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         
         // Re-initialize camera if not already bound (for preview display)
         // Service handles background processing, fragment handles preview when visible
-        if (camera == null && cameraProvider != null) {
-            bindCameraUseCases()
-        } else if (cameraProvider == null) {
-            setUpCamera()
+        // Wait for view to be fully attached before binding camera
+        if (_fragmentCameraBinding != null && fragmentCameraBinding.viewFinder != null) {
+            if (camera == null && cameraProvider != null) {
+                bindCameraUseCases()
+            } else if (cameraProvider == null) {
+                setUpCamera()
+            } else {
+                // Camera provider exists but no camera bound - rebind
+                bindCameraUseCases()
+            }
         } else {
-            // Camera provider exists but no camera bound - rebind
-            bindCameraUseCases()
+            // View not ready yet, set up camera provider first
+            if (cameraProvider == null) {
+                setUpCamera()
+            }
         }
     }
     
@@ -399,8 +407,14 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             faceLandmarkerHelperListener = this
         )
         
-        // Initialize camera for preview (service handles processing, but we need preview for UI)
-        setUpCamera()
+        // Wait for view to be fully laid out before initializing camera
+        // This ensures viewFinder is attached to window and display is available
+        fragmentCameraBinding.viewFinder.post {
+            if (isAdded && !isDetached) {
+                // Initialize camera for preview (service handles processing, but we need preview for UI)
+                setUpCamera()
+            }
+        }
     }
     
     private fun requestOverlayPermission() {
@@ -506,11 +520,21 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener(
             {
-                // CameraProvider
-                cameraProvider = cameraProviderFuture.get()
+                try {
+                    // CameraProvider
+                    cameraProvider = cameraProviderFuture.get()
 
-                // Build and bind the camera use cases
-                bindCameraUseCases()
+                    // Only bind if view is ready
+                    if (_fragmentCameraBinding != null && fragmentCameraBinding.viewFinder != null) {
+                        // Build and bind the camera use cases
+                        bindCameraUseCases()
+                    } else {
+                        LogcatManager.addLog("Camera provider ready but view not ready yet - will bind when view is ready", "Camera")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error setting up camera: ${e.message}", e)
+                    LogcatManager.addLog("Error setting up camera: ${e.message}", "Camera")
+                }
             }, ContextCompat.getMainExecutor(requireContext())
         )
     }
@@ -526,15 +550,30 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         val cameraSelector =
             CameraSelector.Builder().requireLensFacing(cameraFacing).build()
 
+        // Get rotation safely - handle null display
+        val rotation = try {
+            fragmentCameraBinding.viewFinder.display?.rotation 
+                ?: requireContext().resources.configuration.orientation.let {
+                    when (it) {
+                        Configuration.ORIENTATION_LANDSCAPE -> 90
+                        Configuration.ORIENTATION_PORTRAIT -> 0
+                        else -> 0
+                    }
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting display rotation: ${e.message}", e)
+            0 // Default to portrait
+        }
+
         // Preview. Only using the 4:3 ratio because this is the closest to our models
         preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3)
-            .setTargetRotation(fragmentCameraBinding.viewFinder.display.rotation)
+            .setTargetRotation(rotation)
             .build()
 
         // ImageAnalysis. Using RGBA 8888 to match how our models work
         imageAnalyzer =
             ImageAnalysis.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                .setTargetRotation(fragmentCameraBinding.viewFinder.display.rotation)
+                .setTargetRotation(rotation)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
@@ -569,7 +608,14 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             LogcatManager.addLog("Camera bound to ProcessLifecycleOwner - will continue in background", "Camera")
 
             // Attach the viewfinder's surface provider to preview use case
-            preview?.setSurfaceProvider(fragmentCameraBinding.viewFinder.surfaceProvider)
+            // Ensure viewFinder is properly initialized before setting surface provider
+            if (_fragmentCameraBinding != null && fragmentCameraBinding.viewFinder != null) {
+                preview?.setSurfaceProvider(fragmentCameraBinding.viewFinder.surfaceProvider)
+                LogcatManager.addLog("Camera preview surface provider attached", "Camera")
+            } else {
+                Log.e(TAG, "Warning: viewFinder not available when binding camera")
+                LogcatManager.addLog("Warning: viewFinder not available when binding camera", "Camera")
+            }
             LogcatManager.addLog("Camera bound successfully", "Camera")
             
             // Verify wake lock is active
@@ -636,8 +682,19 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        imageAnalyzer?.targetRotation =
-            fragmentCameraBinding.viewFinder.display.rotation
+        try {
+            val rotation = fragmentCameraBinding.viewFinder.display?.rotation 
+                ?: newConfig.orientation.let {
+                    when (it) {
+                        Configuration.ORIENTATION_LANDSCAPE -> 90
+                        Configuration.ORIENTATION_PORTRAIT -> 0
+                        else -> 0
+                    }
+                }
+            imageAnalyzer?.targetRotation = rotation
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating rotation on configuration change: ${e.message}", e)
+        }
     }
 
     // Update UI after face have been detected. Extracts original

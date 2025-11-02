@@ -73,6 +73,7 @@ class MouseControlService : AccessibilityService() {
     
     /**
      * Move cursor using GestureDescription (Android 7.0+)
+     * Can be called from any thread - internally ensures main thread execution
      */
     fun performMouseMove(x: Float, y: Float) {
         try {
@@ -81,6 +82,22 @@ class MouseControlService : AccessibilityService() {
                 return
             }
             
+            // Ensure we're on the main thread for gesture dispatch
+            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+                performMouseMoveInternal(x, y)
+            } else {
+                // Post to main thread handler
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    performMouseMoveInternal(x, y)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error moving cursor: ${e.message}", e)
+        }
+    }
+    
+    private fun performMouseMoveInternal(x: Float, y: Float) {
+        try {
             val currentTime = System.currentTimeMillis()
             val smoothingFactor = getSmoothingFactor()
             val movementDuration = getMovementDuration()
@@ -116,21 +133,50 @@ class MouseControlService : AccessibilityService() {
                 )
                 .build()
             
+            // Check if service is still connected
+            if (instance == null) {
+                Log.w(TAG, "Service instance is null, cannot dispatch gesture")
+                return
+            }
+            
             dispatchGesture(gesture, null, null)
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error moving cursor: ${e.message}", e)
+            Log.e(TAG, "Error in performMouseMoveInternal: ${e.message}", e)
         }
     }
     
     /**
      * Perform a click at the current cursor position
+     * Can be called from any thread - internally ensures main thread execution
      */
     fun performMouseClick() {
         try {
+            // Ensure we're on the main thread for gesture dispatch
+            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+                performMouseClickInternal()
+            } else {
+                // Post to main thread handler
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    performMouseClickInternal()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error performing click: ${e.message}", e)
+        }
+    }
+    
+    private fun performMouseClickInternal() {
+        try {
             // Check if we have a valid position
             if (lastX <= 0 || lastY <= 0) {
-                Log.w(TAG, "Cannot perform click: invalid position")
+                Log.w(TAG, "Cannot perform click: invalid position (lastX=$lastX, lastY=$lastY)")
+                return
+            }
+            
+            // Check if service is still connected
+            if (instance == null) {
+                Log.w(TAG, "Service instance is null, cannot perform click")
                 return
             }
             
@@ -163,7 +209,7 @@ class MouseControlService : AccessibilityService() {
             }, null)
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error performing click: ${e.message}", e)
+            Log.e(TAG, "Error in performMouseClickInternal: ${e.message}", e)
         }
     }
     
