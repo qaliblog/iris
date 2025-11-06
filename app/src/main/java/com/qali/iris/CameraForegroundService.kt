@@ -201,8 +201,10 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                             // Update settings dynamically
                             eyeTracker?.setUseOneEye(settingsManager?.useOneEyeDetection ?: false)
                             eyeBlinkDetector?.setBlinkThreshold(settingsManager?.blinkThreshold ?: 0.3f)
+                            eyeBlinkDetector?.setHalfBlinkAccelThreshold(settingsManager?.halfBlinkAccelThreshold ?: 0.15f)
+                            eyeBlinkDetector?.setClickDelayThreshold(settingsManager?.clickDelayThreshold ?: 200L)
                             
-                            // Process frame
+                            // Process frame - this will trigger onResults callback which updates cursor
                             faceLandmarkerHelper?.detectLiveStream(imageProxy, isFrontCamera = true)
                         } catch (e: Exception) {
                             Log.e(TAG, "Error processing frame: ${e.message}", e)

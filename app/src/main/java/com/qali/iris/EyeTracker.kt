@@ -236,21 +236,17 @@ class EyeTracker(
         }
         
         // Calculate eye area (larger area = closer to screen, smaller = farther)
-        // Use one eye or both based on settings
-        val eyeArea: Float = if (useOneEye) {
-            // Use one eye only - prefer right eye
-            (rightEyeRegion?.let { it.width * it.height } ?: leftEyeRegion?.let { it.width * it.height }) ?: 0f
-        } else {
-            // Use both eyes - average area
-            when {
-                leftEyeRegion != null && rightEyeRegion != null -> {
-                    val avgArea = (leftEyeRegion.width * leftEyeRegion.height + rightEyeRegion.width * rightEyeRegion.height) / 2f
-                    avgArea
-                }
-                leftEyeRegion != null -> leftEyeRegion.width * leftEyeRegion.height
-                rightEyeRegion != null -> rightEyeRegion.width * rightEyeRegion.height
-                else -> 0f
+        // ALWAYS use both eyes for distance calculation (regardless of useOneEye setting)
+        // This ensures consistent distance-based effects
+        val eyeArea: Float = when {
+            leftEyeRegion != null && rightEyeRegion != null -> {
+                // Always average both eyes for distance calculation
+                val avgArea = (leftEyeRegion.width * leftEyeRegion.height + rightEyeRegion.width * rightEyeRegion.height) / 2f
+                avgArea
             }
+            leftEyeRegion != null -> leftEyeRegion.width * leftEyeRegion.height
+            rightEyeRegion != null -> rightEyeRegion.width * rightEyeRegion.height
+            else -> 0f
         }
         
         // Calculate distance metric: 0 for biggest area (closest), increases as area decreases
@@ -263,8 +259,39 @@ class EyeTracker(
         }
         
         // Get eye position for effect calculations
-        val eyePosX = finalPoint?.x ?: 0.5f
-        val eyePosY = finalPoint?.y ?: 0.5f
+        // ALWAYS use average of both eyes for X/Y position effects (regardless of useOneEye setting)
+        // This ensures consistent position-based effects
+        val eyePosX: Float = when {
+            leftEyeRegion != null && rightEyeRegion != null -> {
+                // Always average both eyes for X position effect
+                (leftEyeRegion.center.x + rightEyeRegion.center.x) / 2f
+            }
+            leftPupil != null && rightPupil != null -> {
+                // Use average of both pupils if available
+                (leftPupil.x + rightPupil.x) / 2f
+            }
+            leftEyeRegion != null -> leftEyeRegion.center.x
+            rightEyeRegion != null -> rightEyeRegion.center.x
+            leftPupil != null -> leftPupil.x
+            rightPupil != null -> rightPupil.x
+            else -> finalPoint?.x ?: 0.5f
+        }
+        
+        val eyePosY: Float = when {
+            leftEyeRegion != null && rightEyeRegion != null -> {
+                // Always average both eyes for Y position effect
+                (leftEyeRegion.center.y + rightEyeRegion.center.y) / 2f
+            }
+            leftPupil != null && rightPupil != null -> {
+                // Use average of both pupils if available
+                (leftPupil.y + rightPupil.y) / 2f
+            }
+            leftEyeRegion != null -> leftEyeRegion.center.y
+            rightEyeRegion != null -> rightEyeRegion.center.y
+            leftPupil != null -> leftPupil.y
+            rightPupil != null -> rightPupil.y
+            else -> finalPoint?.y ?: 0.5f
+        }
         
         // Map normalized coordinates (0-1) to screen coordinates (base position)
         val baseScreenX = if (finalPoint != null) {

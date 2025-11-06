@@ -204,21 +204,24 @@ class PointerOverlayService : Service() {
                 
                 try {
                     // Ensure view is visible BEFORE updating layout
+                    // This is critical for background updates
                     if (view.visibility != View.VISIBLE) {
                         view.visibility = View.VISIBLE
+                        Log.d(TAG, "Pointer view made visible for background update")
                     }
                     
                     // Always update on main thread immediately
-                    if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-                        windowManager?.updateViewLayout(view, it)
-                    } else {
-                        // Post to main thread if we're on background thread - use post() for immediate execution
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            try {
-                                windowManager?.updateViewLayout(view, it)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Error updating pointer position on main thread: ${e.message}", e)
+                    // Use Handler.post to ensure it runs even from background threads
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        try {
+                            windowManager?.updateViewLayout(view, it)
+                            // Log periodically to confirm updates (every 2 seconds)
+                            val now = System.currentTimeMillis()
+                            if (now % 2000 < 50) {
+                                Log.d(TAG, "Pointer updated in background to ($screenX, $screenY)")
                             }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error updating pointer position on main thread: ${e.message}", e)
                         }
                     }
                 } catch (e: Exception) {
