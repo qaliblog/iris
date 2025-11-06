@@ -35,6 +35,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
     private var eyeTracker: EyeTracker? = null
     private var pointerX: Float = -1f
     private var pointerY: Float = -1f
+    private var clickPosition: android.graphics.PointF? = null // Position where click happened
 
     private var scaleFactor: Float = 1f
     private var imageWidth: Int = 1
@@ -61,6 +62,18 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         pointerY = y
         // Post invalidate to main thread to ensure thread safety
         post { invalidate() }
+    }
+    
+    fun setClickPosition(x: Float, y: Float) {
+        clickPosition = android.graphics.PointF(x, y)
+        // Post invalidate to main thread to ensure thread safety
+        post { invalidate() }
+        
+        // Clear click position after a delay (show for 500ms)
+        postDelayed({
+            clickPosition = null
+            invalidate()
+        }, 500)
     }
 
     private fun initPaints() {
@@ -93,6 +106,11 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         if (pointerX >= 0 && pointerY >= 0) {
             drawPointer(canvas, pointerX, pointerY)
         }
+        
+        // Draw click dot at click position if available
+        clickPosition?.let { clickPos ->
+            drawClickDot(canvas, clickPos.x, clickPos.y)
+        }
 
         // Clear previous drawings if results exist but have no face landmarks
         if (results?.faceLandmarks().isNullOrEmpty()) {
@@ -115,14 +133,69 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         }
     }
     
+    private fun drawClickDot(canvas: Canvas, x: Float, y: Float) {
+        val clickDotPaint = Paint().apply {
+            color = Color.YELLOW
+            strokeWidth = 8f
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+        val clickDotOuterPaint = Paint().apply {
+            color = Color.YELLOW
+            strokeWidth = 3f
+            style = Paint.Style.STROKE
+            alpha = 200
+            isAntiAlias = true
+        }
+        
+        // Draw click dot at landmark position (scaled to canvas coordinates)
+        val dotRadius = 15f
+        val outerRadius = 25f
+        
+        // Draw outer ring
+        canvas.drawCircle(x, y, outerRadius, clickDotOuterPaint)
+        // Draw center dot
+        canvas.drawCircle(x, y, dotRadius, clickDotPaint)
+    }
+    
+    private var cursorColor: Int = Color.BLUE // Default cursor color
+    private var clickColor: Int = Color.GREEN // Default click color
+    private var isClicking = false
+    private var clickEndTime = 0L
+    private val CLICK_COLOR_DURATION_MS = 200L
+    
+    fun setCursorColor(color: Int) {
+        cursorColor = color
+        invalidate()
+    }
+    
+    fun setClickColor(color: Int) {
+        clickColor = color
+        invalidate()
+    }
+    
+    fun indicateClick() {
+        isClicking = true
+        clickEndTime = System.currentTimeMillis() + CLICK_COLOR_DURATION_MS
+        invalidate()
+        
+        // Reset color after duration
+        postDelayed({
+            isClicking = false
+            invalidate()
+        }, CLICK_COLOR_DURATION_MS)
+    }
+    
     private fun drawPointer(canvas: Canvas, x: Float, y: Float) {
+        val currentColor = if (isClicking && System.currentTimeMillis() < clickEndTime) clickColor else cursorColor
+        
         val pointerPaint = Paint().apply {
-            color = Color.RED
+            color = currentColor
             strokeWidth = 10f
             style = Paint.Style.FILL
         }
         val outerPaint = Paint().apply {
-            color = Color.RED
+            color = currentColor
             strokeWidth = 3f
             style = Paint.Style.STROKE
             alpha = 128

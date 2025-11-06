@@ -289,11 +289,19 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         // Set SettingsManager in MouseControlService for cursor update configuration
         MouseControlService.getInstance()?.setSettingsManager(settingsManager)
         
-        // Initialize blink detector for click functionality with threshold from settings
-        eyeBlinkDetector = EyeBlinkDetector(settingsManager.blinkThreshold)
+        // Initialize blink detector for click functionality with thresholds from settings
+        eyeBlinkDetector = EyeBlinkDetector(
+            initialBlinkThreshold = settingsManager.blinkThreshold,
+            initialHalfBlinkAccelThreshold = settingsManager.halfBlinkAccelThreshold,
+            initialClickDelayThreshold = settingsManager.clickDelayThreshold
+        )
         
         // Set EyeTracker in OverlayView
         fragmentCameraBinding.overlay.setEyeTracker(eyeTracker)
+        
+        // Apply cursor colors from settings
+        fragmentCameraBinding.overlay.setCursorColor(settingsManager.cursorColor)
+        fragmentCameraBinding.overlay.setClickColor(settingsManager.clickColor)
 
         // Setup settings button - use FragmentManager directly instead of Navigation Component
         // Set up immediately without delay to ensure it works
@@ -716,25 +724,68 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             
             val trackingResult = eyeTracker.trackEyes(landmarks)
             
-            // Update blink detector threshold if settings changed
-            val currentThreshold = settingsManager.blinkThreshold
-            eyeBlinkDetector.setBlinkThreshold(currentThreshold)
+            // Apply all adjustments from settings first (needed for click position)
+            val (adjustedX, adjustedY) = trackingCalculator.calculateAdjustedPosition(trackingResult)
             
-            // Detect blink for click functionality
-            val blinkDetected = eyeBlinkDetector.processEyeArea(trackingResult.eyeArea)
+            // Update blink detector thresholds if settings changed
+            eyeBlinkDetector.setBlinkThreshold(settingsManager.blinkThreshold)
+            eyeBlinkDetector.setHalfBlinkAccelThreshold(settingsManager.halfBlinkAccelThreshold)
+            eyeBlinkDetector.setClickDelayThreshold(settingsManager.clickDelayThreshold)
+            
+            // Detect blink using eyelid landmarks (preferred) or fallback to eye area
+            val blinkDetected = if (trackingResult.leftEyelidLandmarks != null || trackingResult.rightEyelidLandmarks != null) {
+                // Use eyelid landmarks for more accurate detection
+                val combinedEyelid = if (settingsManager.useOneEyeDetection) {
+                    trackingResult.rightEyelidLandmarks ?: trackingResult.leftEyelidLandmarks
+                } else {
+                    // Average both eyes
+                    when {
+                        trackingResult.leftEyelidLandmarks != null && trackingResult.rightEyelidLandmarks != null -> {
+                            EyeTracker.EyelidLandmarks(
+                                upperLidY = (trackingResult.leftEyelidLandmarks!!.upperLidY + trackingResult.rightEyelidLandmarks!!.upperLidY) / 2f,
+                                lowerLidY = (trackingResult.leftEyelidLandmarks!!.lowerLidY + trackingResult.rightEyelidLandmarks!!.lowerLidY) / 2f
+                            )
+                        }
+                        trackingResult.leftEyelidLandmarks != null -> trackingResult.leftEyelidLandmarks
+                        trackingResult.rightEyelidLandmarks != null -> trackingResult.rightEyelidLandmarks
+                        else -> null
+                    }
+                }
+                
+                if (combinedEyelid != null) {
+                    // Pass click position for relative calculations
+                    val clickPosition = android.graphics.PointF(adjustedX, adjustedY)
+                    eyeBlinkDetector.processEyelidLandmarks(
+                        upperLidY = combinedEyelid.upperLidY,
+                        lowerLidY = combinedEyelid.lowerLidY,
+                        clickPosition = clickPosition
+                    )
+                } else {
+                    false
+                }
+            } else {
+                // Fallback to eye area method
+                eyeBlinkDetector.processEyeArea(trackingResult.eyeArea)
+            }
             if (blinkDetected) {
                 // Trigger click
                 try {
                     MouseControlService.performClick()
                     PointerOverlayService.indicateClick()
+                    // Draw click dot at landmark position and indicate click in overlay
+                    if (isResumed && _fragmentCameraBinding != null) {
+                        activity?.runOnUiThread {
+                            if (_fragmentCameraBinding != null) {
+                                fragmentCameraBinding.overlay.setClickPosition(adjustedX, adjustedY)
+                                fragmentCameraBinding.overlay.indicateClick()
+                            }
+                        }
+                    }
                     LogcatManager.addLog("Click detected via blink", "Tracking")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to perform click: ${e.message}", e)
                 }
             }
-            
-            // Apply all adjustments from settings
-            val (adjustedX, adjustedY) = trackingCalculator.calculateAdjustedPosition(trackingResult)
             
             // Check global flag to see if cursor movement should be enabled (disabled when settings are open)
             val cursorEnabled = CameraFragment.isCursorMovementEnabled()

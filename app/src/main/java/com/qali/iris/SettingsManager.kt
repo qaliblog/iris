@@ -76,6 +76,28 @@ class SettingsManager(context: Context) {
         get() = prefs.getLong(KEY_CURSOR_MOVEMENT_DURATION, 100L)
         set(value) = prefs.edit().putLong(KEY_CURSOR_MOVEMENT_DURATION, value.coerceIn(50L, 300L)).apply()
     
+    // Half-blink acceleration threshold (default 0.15)
+    // Lower = more sensitive to partial blinks, higher = requires more acceleration
+    var halfBlinkAccelThreshold: Float
+        get() = prefs.getFloat(KEY_HALF_BLINK_ACCEL_THRESHOLD, 0.15f)
+        set(value) = prefs.edit().putFloat(KEY_HALF_BLINK_ACCEL_THRESHOLD, value.coerceIn(0.05f, 1.0f)).apply()
+    
+    // Click delay threshold in milliseconds (default 200ms)
+    // Time to account for previous click position when detecting new clicks
+    var clickDelayThreshold: Long
+        get() = prefs.getLong(KEY_CLICK_DELAY_THRESHOLD, 200L)
+        set(value) = prefs.edit().putLong(KEY_CLICK_DELAY_THRESHOLD, value.coerceIn(0L, 1000L)).apply()
+    
+    // Cursor color (default blue)
+    var cursorColor: Int
+        get() = prefs.getInt(KEY_CURSOR_COLOR, android.graphics.Color.BLUE)
+        set(value) = prefs.edit().putInt(KEY_CURSOR_COLOR, value).apply()
+    
+    // Click color (default green)
+    var clickColor: Int
+        get() = prefs.getInt(KEY_CLICK_COLOR, android.graphics.Color.GREEN)
+        set(value) = prefs.edit().putInt(KEY_CLICK_COLOR, value).apply()
+    
     companion object {
         private const val PREFS_NAME = "iris_settings"
         
@@ -92,5 +114,9 @@ class SettingsManager(context: Context) {
         private const val KEY_CURSOR_SMOOTHING = "cursor_smoothing"
         private const val KEY_CURSOR_UPDATE_INTERVAL = "cursor_update_interval"
         private const val KEY_CURSOR_MOVEMENT_DURATION = "cursor_movement_duration"
+        private const val KEY_HALF_BLINK_ACCEL_THRESHOLD = "half_blink_accel_threshold"
+        private const val KEY_CLICK_DELAY_THRESHOLD = "click_delay_threshold"
+        private const val KEY_CURSOR_COLOR = "cursor_color"
+        private const val KEY_CLICK_COLOR = "click_color"
     }
 }

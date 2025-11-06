@@ -16,6 +16,7 @@ import android.text.TextWatcher
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import com.qali.iris.LogcatManager
+import com.qali.iris.PointerOverlayService
 import com.qali.iris.R
 import com.qali.iris.SettingsManager
 import com.qali.iris.databinding.FragmentSettingsBinding
@@ -102,6 +103,7 @@ class SettingsFragment : Fragment() {
         setupDistanceMultipliers()
         setupWakeLockToggle()
         setupBlinkDetection()
+        setupCursorTheming()
         setupCursorUpdateSettings()
         setupPermissions()
     }
@@ -118,6 +120,17 @@ class SettingsFragment : Fragment() {
             val switch = it.root.findViewById<android.widget.Switch>(R.id.wake_lock_toggle)
             switch?.isChecked = isEnabled
         }
+        
+        // Update color previews from settings
+        _binding?.let {
+            val cursorColorPreview = it.cursorColorPreview
+            val clickColorPreview = it.clickColorPreview
+            cursorColorPreview?.setBackgroundColor(settingsManager.cursorColor)
+            clickColorPreview?.setBackgroundColor(settingsManager.clickColor)
+        }
+        
+        // Apply cursor colors when settings resume
+        applyCursorColors()
         
         // Register logcat listener only if view is created
         try {
@@ -512,7 +525,7 @@ class SettingsFragment : Fragment() {
             }
         }
         
-            // Track when user starts/finishes editing
+        // Track when user starts/finishes editing
         editText.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
                 isUserEditing = true
@@ -531,9 +544,16 @@ class SettingsFragment : Fragment() {
                     }
                 }
             } else {
-                // Only update when focus is lost AND user was editing
+                // Focus lost - escape typing mode immediately
+                // This handles cases where cursor jumps out of typing for any reason
                 if (isUserEditing) {
                     isUserEditing = false
+                    // Clear focus immediately to escape typing
+                    editText.clearFocus()
+                    // Hide keyboard
+                    val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                    imm?.hideSoftInputFromWindow(editText.windowToken, 0)
+                    
                     try {
                         val inputValue = editText.text.toString().toFloatOrNull()
                         if (inputValue != null) {
@@ -570,6 +590,19 @@ class SettingsFragment : Fragment() {
                 reEnableRunnable?.let { handler.removeCallbacks(it) }
                 // Immediately cancel any pending re-enable
                 reEnableRunnable = null
+                
+                // Check if cursor position changed unexpectedly (cursor jumped out)
+                // If selection changed while user is typing, escape typing mode
+                editText.post {
+                    if (isUserEditing && !editText.isFocused) {
+                        // Cursor jumped out - escape typing immediately
+                        isUserEditing = false
+                        editText.clearFocus()
+                        val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                        imm?.hideSoftInputFromWindow(editText.windowToken, 0)
+                        LogcatManager.addLog("Typing escaped - cursor jumped out", "Settings")
+                    }
+                }
             }
             override fun afterTextChanged(s: Editable?) {
                 isUserEditing = true
@@ -579,6 +612,18 @@ class SettingsFragment : Fragment() {
                 // Don't schedule re-enable - cursor stays disabled while settings are open
             }
         })
+        
+        // Monitor selection changes to detect cursor jumping
+        editText.setOnSelectionChangedListener { start: Int, end: Int ->
+            if (isUserEditing && !editText.isFocused) {
+                // Selection changed but lost focus - cursor jumped out
+                isUserEditing = false
+                editText.clearFocus()
+                val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(editText.windowToken, 0)
+                LogcatManager.addLog("Typing escaped - selection changed unexpectedly", "Settings")
+            }
+        }
     }
     
     private fun updateValue(editText: EditText, value: Float) {
@@ -683,6 +728,158 @@ class SettingsFragment : Fragment() {
             settingsManager.useOneEyeDetection = isChecked
             LogcatManager.addLog("One eye detection: ${if (isChecked) "enabled" else "disabled"}", "Settings")
         }
+        
+        // Setup half-blink acceleration threshold
+        setupValueEditor(
+            binding.halfBlinkAccelThresholdValue,
+            { settingsManager.halfBlinkAccelThreshold },
+            { 
+                settingsManager.halfBlinkAccelThreshold = it
+                // Update blink detector in CameraFragment and service if possible
+                LogcatManager.addLog("Half-blink acceleration threshold updated: ${df.format(it)}", "Settings")
+            },
+            "Half-Blink Acceleration Threshold",
+            0.01f
+        )
+        
+        binding.halfBlinkAccelThresholdMinus.setOnClickListener {
+            binding.halfBlinkAccelThresholdValue.clearFocus()
+            val newValue = (settingsManager.halfBlinkAccelThreshold - 0.01f).coerceIn(0.05f, 1.0f)
+            settingsManager.halfBlinkAccelThreshold = newValue
+            updateValue(binding.halfBlinkAccelThresholdValue, newValue)
+            LogcatManager.addLog("Half-blink acceleration threshold: ${df.format(newValue)}", "Settings")
+        }
+        
+        binding.halfBlinkAccelThresholdPlus.setOnClickListener {
+            binding.halfBlinkAccelThresholdValue.clearFocus()
+            val newValue = (settingsManager.halfBlinkAccelThreshold + 0.01f).coerceIn(0.05f, 1.0f)
+            settingsManager.halfBlinkAccelThreshold = newValue
+            updateValue(binding.halfBlinkAccelThresholdValue, newValue)
+            LogcatManager.addLog("Half-blink acceleration threshold: ${df.format(newValue)}", "Settings")
+        }
+        
+        // Setup click delay threshold
+        setupValueEditor(
+            binding.clickDelayThresholdValue,
+            { settingsManager.clickDelayThreshold.toFloat() },
+            { settingsManager.clickDelayThreshold = it.toLong() },
+            "Click Delay Threshold",
+            10f
+        )
+        
+        binding.clickDelayThresholdMinus.setOnClickListener {
+            binding.clickDelayThresholdValue.clearFocus()
+            val newValue = (settingsManager.clickDelayThreshold - 10).coerceIn(0L, 1000L)
+            settingsManager.clickDelayThreshold = newValue
+            updateValue(binding.clickDelayThresholdValue, newValue.toFloat())
+            LogcatManager.addLog("Click delay threshold: ${newValue}ms", "Settings")
+        }
+        
+        binding.clickDelayThresholdPlus.setOnClickListener {
+            binding.clickDelayThresholdValue.clearFocus()
+            val newValue = (settingsManager.clickDelayThreshold + 10).coerceIn(0L, 1000L)
+            settingsManager.clickDelayThreshold = newValue
+            updateValue(binding.clickDelayThresholdValue, newValue.toFloat())
+            LogcatManager.addLog("Click delay threshold: ${newValue}ms", "Settings")
+        }
+    }
+    
+    private fun setupCursorTheming() {
+        // Setup cursor color preview and button
+        val cursorColorPreview = binding.cursorColorPreview
+        val cursorColorButton = binding.cursorColorButton
+        val clickColorPreview = binding.clickColorPreview
+        val clickColorButton = binding.clickColorButton
+        
+        // Update preview colors from settings
+        fun updateColorPreviews() {
+            val cursorColor = settingsManager.cursorColor
+            val clickColor = settingsManager.clickColor
+            cursorColorPreview.setBackgroundColor(cursorColor)
+            clickColorPreview.setBackgroundColor(clickColor)
+        }
+        
+        // Initial update
+        updateColorPreviews()
+        
+        // Cursor color button
+        cursorColorButton.setOnClickListener {
+            showColorPickerDialog("Cursor Color", settingsManager.cursorColor) { color ->
+                settingsManager.cursorColor = color
+                updateColorPreviews()
+                // Apply to pointer views
+                applyCursorColors()
+                LogcatManager.addLog("Cursor color updated: #${Integer.toHexString(color)}", "Settings")
+            }
+        }
+        
+        // Click color button
+        clickColorButton.setOnClickListener {
+            showColorPickerDialog("Click Color", settingsManager.clickColor) { color ->
+                settingsManager.clickColor = color
+                updateColorPreviews()
+                // Apply to pointer views
+                applyCursorColors()
+                LogcatManager.addLog("Click color updated: #${Integer.toHexString(color)}", "Settings")
+            }
+        }
+    }
+    
+    private fun applyCursorColors() {
+        val cursorColor = settingsManager.cursorColor
+        val clickColor = settingsManager.clickColor
+        
+        // Apply to PointerOverlayService
+        PointerOverlayService.getInstance()?.let { service ->
+            service.pointerView?.setCursorColor(cursorColor)
+            service.pointerView?.setClickColor(clickColor)
+        }
+        
+        // Apply to OverlayView in CameraFragment
+        try {
+            val cameraFragment = parentFragmentManager.findFragmentByTag("CameraFragment")
+                ?: parentFragmentManager.fragments.firstOrNull { it is CameraFragment }
+            (cameraFragment as? CameraFragment)?.let { fragment ->
+                fragment.view?.let { view ->
+                    val overlay = view.findViewById<com.qali.iris.OverlayView>(R.id.overlay)
+                    overlay?.setCursorColor(cursorColor)
+                    overlay?.setClickColor(clickColor)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsFragment", "Error applying cursor colors: ${e.message}", e)
+        }
+    }
+    
+    private fun showColorPickerDialog(title: String, currentColor: Int, onColorSelected: (Int) -> Unit) {
+        // Simple color picker using predefined colors
+        val colors = arrayOf(
+            android.graphics.Color.BLUE,
+            android.graphics.Color.GREEN,
+            android.graphics.Color.RED,
+            android.graphics.Color.YELLOW,
+            android.graphics.Color.CYAN,
+            android.graphics.Color.MAGENTA,
+            android.graphics.Color.WHITE,
+            android.graphics.Color.BLACK,
+            android.graphics.Color.parseColor("#FF9800"), // Orange
+            android.graphics.Color.parseColor("#9C27B0"), // Purple
+            android.graphics.Color.parseColor("#00BCD4"), // Teal
+            android.graphics.Color.parseColor("#FFEB3B")  // Yellow
+        )
+        
+        val colorNames = arrayOf(
+            "Blue", "Green", "Red", "Yellow", "Cyan", "Magenta",
+            "White", "Black", "Orange", "Purple", "Teal", "Light Yellow"
+        )
+        
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle(title)
+            .setItems(colorNames) { _, which ->
+                onColorSelected(colors[which])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
     
     private fun setupCursorUpdateSettings() {

@@ -40,8 +40,10 @@ class PointerOverlayService : Service() {
         }
     }
     
+    var pointerView: PointerView? = null
+        private set
+    
     private var windowManager: WindowManager? = null
-    private var pointerView: PointerView? = null
     private var pointerLayout: FrameLayout? = null
     
     override fun onCreate() {
@@ -123,6 +125,10 @@ class PointerOverlayService : Service() {
         // Create custom pointer view
         pointerView = PointerView(this).apply {
             layoutParams = FrameLayout.LayoutParams(60, 60)
+            // Apply colors from settings
+            val settingsManager = SettingsManager(this@PointerOverlayService)
+            setCursorColor(settingsManager.cursorColor)
+            setClickColor(settingsManager.clickColor)
         }
         
         pointerLayout?.addView(pointerView)

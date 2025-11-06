@@ -9,7 +9,7 @@
         android:id="@+id/back_button"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_gravity="top|start"
+        android:layout_gravity="top|end"
         android:layout_margin="16dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@android:drawable/ic_menu_revert"
@@ -116,12 +116,12 @@
 
             <EditText
                 android:id="@+id/x_movement_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="1.0"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -159,12 +159,12 @@
 
             <EditText
                 android:id="@+id/y_movement_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="1.0"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -212,12 +212,12 @@
 
             <EditText
                 android:id="@+id/eye_pos_x_effect_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="0.0"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -255,12 +255,12 @@
 
             <EditText
                 android:id="@+id/eye_pos_x_mult_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="1.0"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -298,12 +298,12 @@
 
             <EditText
                 android:id="@+id/eye_pos_y_effect_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="0.0"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -341,12 +341,12 @@
 
             <EditText
                 android:id="@+id/eye_pos_y_mult_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="1.0"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -394,12 +394,12 @@
 
             <EditText
                 android:id="@+id/distance_x_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="0.0"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -437,12 +437,12 @@
 
             <EditText
                 android:id="@+id/distance_y_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="0.0"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -520,12 +520,12 @@
 
             <EditText
                 android:id="@+id/blink_threshold_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="0.3"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"
@@ -567,6 +567,160 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
+        <!-- Half-Blink Acceleration Threshold -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Half-Blink Acceleration Threshold"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/half_blink_accel_threshold_value"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="0.15"
+                android:textSize="14sp"
+                android:inputType="numberDecimal|numberSigned"
+                android:minWidth="120dp"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="@android:drawable/edit_text"
+                android:selectAllOnFocus="true" />
+
+            <Button
+                android:id="@+id/half_blink_accel_threshold_minus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="-"
+                android:layout_marginStart="8dp" />
+
+            <Button
+                android:id="@+id/half_blink_accel_threshold_plus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="+"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- Click Delay Threshold -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Click Delay Threshold (ms)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/click_delay_threshold_value"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="200"
+                android:textSize="14sp"
+                android:inputType="number"
+                android:minWidth="120dp"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="@android:drawable/edit_text"
+                android:selectAllOnFocus="true" />
+
+            <Button
+                android:id="@+id/click_delay_threshold_minus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="-"
+                android:layout_marginStart="8dp" />
+
+            <Button
+                android:id="@+id/click_delay_threshold_plus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="+"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- Cursor Theming -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cursor Theming"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Cursor Color -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Cursor Color"
+                android:textSize="14sp" />
+
+            <View
+                android:id="@+id/cursor_color_preview"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:drawable/edit_text"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/cursor_color_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Choose Color" />
+        </LinearLayout>
+
+        <!-- Click Color -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Click Color"
+                android:textSize="14sp" />
+
+            <View
+                android:id="@+id/click_color_preview"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:drawable/edit_text"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/click_color_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Choose Color" />
+        </LinearLayout>
+
         <!-- Cursor Update Settings -->
         <TextView
             android:layout_width="match_parent"
@@ -594,12 +748,12 @@
 
             <EditText
                 android:id="@+id/cursor_smoothing_value"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="0.7"
                 android:textSize="14sp"
                 android:inputType="numberDecimal|numberSigned"
-                android:minWidth="80dp"
+                android:minWidth="120dp"
                 android:gravity="center"
                 android:padding="8dp"
                 android:background="@android:drawable/edit_text"

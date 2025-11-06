@@ -13,28 +13,54 @@ class PointerView(context: Context) : View(context) {
     
     private var isClicking = false
     private var clickEndTime = 0L
-    private val CLICK_COLOR_DURATION_MS = 200L // Show green for 200ms
+    private val CLICK_COLOR_DURATION_MS = 200L // Show click color for 200ms
+    
+    // Default colors: blue for cursor, green for click
+    private var cursorColor: Int = Color.BLUE
+    private var clickColor: Int = Color.GREEN
     
     private val pointerPaint = Paint().apply {
-        color = Color.RED
+        color = Color.BLUE
         strokeWidth = 3f
         style = Paint.Style.STROKE
         isAntiAlias = true
     }
     
     private val centerPaint = Paint().apply {
-        color = Color.RED
+        color = Color.BLUE
         strokeWidth = 5f
         style = Paint.Style.FILL
         isAntiAlias = true
     }
     
     private val outerPaint = Paint().apply {
-        color = Color.RED
+        color = Color.BLUE
         strokeWidth = 2f
         style = Paint.Style.STROKE
         alpha = 128
         isAntiAlias = true
+    }
+    
+    /**
+     * Set cursor color (default color when not clicking)
+     */
+    fun setCursorColor(color: Int) {
+        cursorColor = color
+        if (!isClicking) {
+            updatePaintColors()
+            invalidate()
+        }
+    }
+    
+    /**
+     * Set click color (color shown when clicking)
+     */
+    fun setClickColor(color: Int) {
+        clickColor = color
+        if (isClicking) {
+            updatePaintColors()
+            invalidate()
+        }
     }
     
     /**
@@ -55,7 +81,7 @@ class PointerView(context: Context) : View(context) {
     }
     
     private fun updatePaintColors() {
-        val color = if (isClicking) Color.GREEN else Color.RED
+        val color = if (isClicking) clickColor else cursorColor
         pointerPaint.color = color
         centerPaint.color = color
         outerPaint.color = color

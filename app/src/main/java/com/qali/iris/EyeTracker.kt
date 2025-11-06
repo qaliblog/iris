@@ -54,6 +54,11 @@ class EyeTracker(
         val height: Float
     )
     
+    data class EyelidLandmarks(
+        val upperLidY: Float, // Y position of upper eyelid (normalized 0-1, lower Y = more closed)
+        val lowerLidY: Float  // Y position of lower eyelid (normalized 0-1, higher Y = more closed)
+    )
+    
     data class TrackingResult(
         val leftEyeRegion: EyeRegion?,
         val rightEyeRegion: EyeRegion?,
@@ -62,7 +67,9 @@ class EyeTracker(
         val screenY: Float,
         val eyeArea: Float = 0f, // Combined eye area (0 = biggest, increases as eyes get farther)
         val eyePositionX: Float = 0f, // Normalized X position of eyes (0-1)
-        val eyePositionY: Float = 0f  // Normalized Y position of eyes (0-1)
+        val eyePositionY: Float = 0f,  // Normalized Y position of eyes (0-1)
+        val leftEyelidLandmarks: EyelidLandmarks? = null, // Eyelid landmarks for left eye
+        val rightEyelidLandmarks: EyelidLandmarks? = null  // Eyelid landmarks for right eye
     )
     
     /**
@@ -138,11 +145,43 @@ class EyeTracker(
     }
     
     /**
+     * Extract upper and lower eyelid positions from eye landmarks
+     */
+    private fun extractEyelidLandmarks(
+        landmarks: List<NormalizedLandmark>,
+        eyeIndices: List<Int>
+    ): EyelidLandmarks? {
+        if (eyeIndices.isEmpty()) return null
+        
+        val eyePoints = eyeIndices.mapNotNull { index ->
+            landmarks.getOrNull(index)?.let { landmark ->
+                Pair(landmark.x(), landmark.y())
+            }
+        }
+        
+        if (eyePoints.isEmpty()) return null
+        
+        // Find upper and lower eyelids based on Y position
+        // Upper lid has lower Y values, lower lid has higher Y values
+        val upperLidY = eyePoints.minOf { it.second } // Minimum Y = topmost point (upper lid)
+        val lowerLidY = eyePoints.maxOf { it.second } // Maximum Y = bottommost point (lower lid)
+        
+        return EyelidLandmarks(
+            upperLidY = upperLidY,
+            lowerLidY = lowerLidY
+        )
+    }
+    
+    /**
      * Track eyes and calculate screen coordinates
      */
     fun trackEyes(landmarks: List<NormalizedLandmark>): TrackingResult {
         val leftEyeRegion = calculateEyeRegion(landmarks, LEFT_EYE_LINE_INDICES)
         val rightEyeRegion = calculateEyeRegion(landmarks, RIGHT_EYE_LINE_INDICES)
+        
+        // Extract eyelid landmarks
+        val leftEyelidLandmarks = extractEyelidLandmarks(landmarks, LEFT_EYE_LINE_INDICES)
+        val rightEyelidLandmarks = extractEyelidLandmarks(landmarks, RIGHT_EYE_LINE_INDICES)
         
         // Calculate pupil positions from eye regions (MediaPipe doesn't have specific pupil landmarks)
         val leftPupil = getPupilPosition(landmarks, LEFT_EYE_PUPIL_CENTER, LEFT_EYE_LINE_INDICES)
@@ -240,6 +279,25 @@ class EyeTracker(
             displayMetrics.heightPixels / 2f
         }
         
+        // Calculate combined eyelid landmarks (average of both eyes or use one eye)
+        val combinedEyelidLandmarks = if (useOneEye) {
+            // Use one eye only - prefer right eye (left from user's perspective)
+            rightEyelidLandmarks ?: leftEyelidLandmarks
+        } else {
+            // Use both eyes - average the positions
+            when {
+                leftEyelidLandmarks != null && rightEyelidLandmarks != null -> {
+                    EyelidLandmarks(
+                        upperLidY = (leftEyelidLandmarks.upperLidY + rightEyelidLandmarks.upperLidY) / 2f,
+                        lowerLidY = (leftEyelidLandmarks.lowerLidY + rightEyelidLandmarks.lowerLidY) / 2f
+                    )
+                }
+                leftEyelidLandmarks != null -> leftEyelidLandmarks
+                rightEyelidLandmarks != null -> rightEyelidLandmarks
+                else -> null
+            }
+        }
+        
         return TrackingResult(
             leftEyeRegion = leftEyeRegion,
             rightEyeRegion = rightEyeRegion,
@@ -248,7 +306,9 @@ class EyeTracker(
             screenY = baseScreenY,
             eyeArea = distance, // Distance: 0 = closest, increases as farther
             eyePositionX = eyePosX,
-            eyePositionY = eyePosY
+            eyePositionY = eyePosY,
+            leftEyelidLandmarks = leftEyelidLandmarks,
+            rightEyelidLandmarks = rightEyelidLandmarks
         )
     }
     

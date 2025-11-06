@@ -119,7 +119,11 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         settingsManager = SettingsManager(this)
         eyeTracker = EyeTracker(displayMetrics!!, settingsManager!!.useOneEyeDetection)
         trackingCalculator = TrackingCalculator(settingsManager!!, displayMetrics!!)
-        eyeBlinkDetector = EyeBlinkDetector(settingsManager!!.blinkThreshold)
+        eyeBlinkDetector = EyeBlinkDetector(
+            initialBlinkThreshold = settingsManager!!.blinkThreshold,
+            initialHalfBlinkAccelThreshold = settingsManager!!.halfBlinkAccelThreshold,
+            initialClickDelayThreshold = settingsManager!!.clickDelayThreshold
+        )
         
         // Set SettingsManager in MouseControlService for cursor update configuration
         MouseControlService.getInstance()?.setSettingsManager(settingsManager!!)
@@ -356,12 +360,9 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 // Trigger click
                 MouseControlService.performClick()
                 PointerOverlayService.indicateClick()
-                LogcatManager.addLog("Blink click detected", "Service")
+                // Note: Click dot drawing in OverlayView is handled by CameraFragment when visible
+                LogcatManager.addLog("Blink click detected at (${adjustedX.toInt()}, ${adjustedY.toInt()})", "Service")
             }
-            
-            // Calculate adjusted position
-            val (adjustedX, adjustedY) = trackingCalculator?.calculateAdjustedPosition(trackingResult)
-                ?: Pair(trackingResult.screenX, trackingResult.screenY)
             
             // Service always updates pointer in background (regardless of cursor movement flag)
             // The flag is only for fragment UI when settings are open
