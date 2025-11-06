@@ -351,11 +351,50 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             // Track eyes
             val trackingResult = eyeTracker?.trackEyes(landmarks) ?: return
             
-            // Update blink detector threshold
-            eyeBlinkDetector?.setBlinkThreshold(settingsManager?.blinkThreshold ?: 0.3f)
+            // Calculate adjusted position first (needed for click position)
+            val (adjustedX, adjustedY) = trackingCalculator?.calculateAdjustedPosition(trackingResult)
+                ?: Pair(trackingResult.screenX, trackingResult.screenY)
             
-            // Detect blink for click
-            val blinkDetected = eyeBlinkDetector?.processEyeArea(trackingResult.eyeArea) ?: false
+            // Update blink detector thresholds
+            eyeBlinkDetector?.setBlinkThreshold(settingsManager?.blinkThreshold ?: 0.3f)
+            eyeBlinkDetector?.setHalfBlinkAccelThreshold(settingsManager?.halfBlinkAccelThreshold ?: 0.15f)
+            eyeBlinkDetector?.setClickDelayThreshold(settingsManager?.clickDelayThreshold ?: 200L)
+            
+            // Detect blink using eyelid landmarks (preferred) or fallback to eye area
+            val blinkDetected = if (trackingResult.leftEyelidLandmarks != null || trackingResult.rightEyelidLandmarks != null) {
+                // Use eyelid landmarks for more accurate detection
+                val combinedEyelid = if (settingsManager?.useOneEyeDetection == true) {
+                    trackingResult.rightEyelidLandmarks ?: trackingResult.leftEyelidLandmarks
+                } else {
+                    // Average both eyes
+                    when {
+                        trackingResult.leftEyelidLandmarks != null && trackingResult.rightEyelidLandmarks != null -> {
+                            EyeTracker.EyelidLandmarks(
+                                upperLidY = (trackingResult.leftEyelidLandmarks!!.upperLidY + trackingResult.rightEyelidLandmarks!!.upperLidY) / 2f,
+                                lowerLidY = (trackingResult.leftEyelidLandmarks!!.lowerLidY + trackingResult.rightEyelidLandmarks!!.lowerLidY) / 2f
+                            )
+                        }
+                        trackingResult.leftEyelidLandmarks != null -> trackingResult.leftEyelidLandmarks
+                        trackingResult.rightEyelidLandmarks != null -> trackingResult.rightEyelidLandmarks
+                        else -> null
+                    }
+                }
+                
+                if (combinedEyelid != null) {
+                    // Pass click position for relative calculations
+                    val clickPosition = android.graphics.PointF(adjustedX, adjustedY)
+                    eyeBlinkDetector?.processEyelidLandmarks(
+                        upperLidY = combinedEyelid.upperLidY,
+                        lowerLidY = combinedEyelid.lowerLidY,
+                        clickPosition = clickPosition
+                    ) ?: false
+                } else {
+                    false
+                }
+            } else {
+                // Fallback to eye area method
+                eyeBlinkDetector?.processEyeArea(trackingResult.eyeArea) ?: false
+            }
             if (blinkDetected) {
                 // Trigger click
                 MouseControlService.performClick()

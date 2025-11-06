@@ -613,17 +613,9 @@ class SettingsFragment : Fragment() {
             }
         })
         
-        // Monitor selection changes to detect cursor jumping
-        editText.setOnSelectionChangedListener { start: Int, end: Int ->
-            if (isUserEditing && !editText.isFocused) {
-                // Selection changed but lost focus - cursor jumped out
-                isUserEditing = false
-                editText.clearFocus()
-                val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
-                imm?.hideSoftInputFromWindow(editText.windowToken, 0)
-                LogcatManager.addLog("Typing escaped - selection changed unexpectedly", "Settings")
-            }
-        }
+        // Note: Selection change monitoring is handled by the focus change listener
+        // which detects when focus is lost (cursor jumps out). The TextWatcher's
+        // onTextChanged also checks if focus was lost during typing.
     }
     
     private fun updateValue(editText: EditText, value: Float) {
