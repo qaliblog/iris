@@ -21,11 +21,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.text.TextUtils
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.LayoutInflater
@@ -115,6 +115,7 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
     private var isMouseControlEnabled = false
     private var hasCheckedAccessibilityOnResume = false
     private var isSettingsOpening = false
+    private var mouseServiceOnConnected: ((MouseControlService) -> Unit)? = null
 
     override fun onResume() {
         super.onResume()
@@ -261,6 +262,9 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         backgroundExecutor.awaitTermination(
             Long.MAX_VALUE, TimeUnit.NANOSECONDS
         )
+
+        mouseServiceOnConnected?.let { MouseControlService.unregisterOnServiceConnected(it) }
+        mouseServiceOnConnected = null
     }
 
     override fun onCreateView(
@@ -288,6 +292,13 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         
         // Set SettingsManager in MouseControlService for cursor update configuration
         MouseControlService.getInstance()?.setSettingsManager(settingsManager)
+        mouseServiceOnConnected = { service ->
+            service.setSettingsManager(settingsManager)
+            MouseControlService.getPendingCursorPosition()?.let { pointer ->
+                PointerOverlayService.updatePointerPosition(pointer.x, pointer.y)
+            }
+        }
+        mouseServiceOnConnected?.let { MouseControlService.registerOnServiceConnected(it) }
         
         // Initialize blink detector for click functionality with thresholds from settings
         eyeBlinkDetector = EyeBlinkDetector(
@@ -468,10 +479,22 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             if (showPrompt && isResumed && isAdded) {
                 Toast.makeText(requireContext(), "Please enable accessibility service for mouse control", Toast.LENGTH_LONG).show()
                 
-                // Open accessibility settings
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                startActivity(intent)
-                LogcatManager.addLog("Opened accessibility settings", "Camera")
+                // Try to open the specific accessibility service details screen first
+                val component = ComponentName(requireContext(), MouseControlService::class.java)
+                val detailsIntent = Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${component.packageName}/${component.className}")
+                }
+                val packageManager = requireContext().packageManager
+                val resolved = detailsIntent.resolveActivity(packageManager)
+                
+                if (resolved != null) {
+                    startActivity(detailsIntent)
+                    LogcatManager.addLog("Opened accessibility details for MouseControlService", "Camera")
+                } else {
+                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    startActivity(intent)
+                    LogcatManager.addLog("Opened accessibility settings (fallback)", "Camera")
+                }
             }
         } else {
             LogcatManager.addLog("Accessibility service is enabled and ready", "Camera")
@@ -480,6 +503,11 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
     }
     
     private fun isAccessibilityServiceEnabled(): Boolean {
+        val secureEnabled = MouseControlService.isAccessibilityServiceEnabled(requireContext())
+        if (!secureEnabled) {
+            LogcatManager.addLog("Secure settings missing MouseControlService entry", "Camera")
+        }
+
         val accessibilityManager = ContextCompat.getSystemService(requireContext(), AccessibilityManager::class.java) as? AccessibilityManager
             ?: return false
         
@@ -517,7 +545,7 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             LogcatManager.addLog("MouseControlService is enabled and ready", "Camera")
         }
         
-        return isEnabled
+        return secureEnabled && isEnabled
     }
 
     // Removed bottom sheet controls - not needed for full screen app

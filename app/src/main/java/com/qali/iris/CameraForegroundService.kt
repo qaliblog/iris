@@ -83,6 +83,12 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     
     // Display metrics
     private var displayMetrics: DisplayMetrics? = null
+    private val mouseServiceReconnectListener: (MouseControlService) -> Unit = { service ->
+        settingsManager?.let { service.setSettingsManager(it) }
+        MouseControlService.getPendingCursorPosition()?.let { pointer ->
+            PointerOverlayService.updatePointerPosition(pointer.x, pointer.y)
+        }
+    }
     
     override fun onCreate() {
         super.onCreate()
@@ -126,6 +132,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         )
         
         // Set SettingsManager in MouseControlService for cursor update configuration
+        MouseControlService.registerOnServiceConnected(mouseServiceReconnectListener)
         MouseControlService.getInstance()?.setSettingsManager(settingsManager!!)
         
         // Start pointer overlay service
@@ -433,6 +440,11 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     override fun onError(error: String, errorCode: Int) {
         Log.e(TAG, "FaceLandmarkerHelper error: $error (code: $errorCode)")
         LogcatManager.addLog("MediaPipe error: $error", "Service")
+    }
+
+    override fun onDestroy() {
+        MouseControlService.unregisterOnServiceConnected(mouseServiceReconnectListener)
+        super.onDestroy()
     }
     
     private fun createNotificationChannel() {
