@@ -97,6 +97,10 @@ class SettingsManager(context: Context) {
     var clickColor: Int
         get() = prefs.getInt(KEY_CLICK_COLOR, android.graphics.Color.GREEN)
         set(value) = prefs.edit().putInt(KEY_CLICK_COLOR, value).apply()
+
+    var showLivePreview: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_LIVE_PREVIEW, true)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_LIVE_PREVIEW, value).apply()
     
     companion object {
         private const val PREFS_NAME = "iris_settings"
@@ -118,5 +122,6 @@ class SettingsManager(context: Context) {
         private const val KEY_CLICK_DELAY_THRESHOLD = "click_delay_threshold"
         private const val KEY_CURSOR_COLOR = "cursor_color"
         private const val KEY_CLICK_COLOR = "click_color"
+        private const val KEY_SHOW_LIVE_PREVIEW = "show_live_preview"
     }
 }

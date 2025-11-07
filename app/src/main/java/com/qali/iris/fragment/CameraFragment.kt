@@ -130,6 +130,10 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         } else {
             if (cameraProvider == null) setUpCamera()
         }
+
+        if (this::settingsManager.isInitialized) {
+            applyLivePreviewVisibility(settingsManager.showLivePreview)
+        }
     }
 
     override fun onPause() {
@@ -236,6 +240,7 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         binding.overlay.setEyeTracker(eyeTracker)
         binding.overlay.setCursorColor(settingsManager.cursorColor)
         binding.overlay.setClickColor(settingsManager.clickColor)
+        applyLivePreviewVisibility(settingsManager.showLivePreview)
 
         // Settings button
         binding.settingsButton.setOnClickListener {
@@ -508,5 +513,23 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         activity?.runOnUiThread {
             Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun applyLivePreviewVisibility(show: Boolean) {
+        _binding?.viewFinder?.let { previewView ->
+            val desiredVisibility = if (show) View.VISIBLE else View.INVISIBLE
+            if (previewView.visibility != desiredVisibility) {
+                previewView.visibility = desiredVisibility
+            }
+            val desiredAlpha = if (show) 1f else 0f
+            if (previewView.alpha != desiredAlpha) {
+                previewView.alpha = desiredAlpha
+            }
+        }
+    }
+
+    fun setLivePreviewVisible(show: Boolean) {
+        if (!this::settingsManager.isInitialized) return
+        view?.post { applyLivePreviewVisibility(show) } ?: applyLivePreviewVisibility(show)
     }
 }

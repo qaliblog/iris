@@ -55,6 +55,17 @@ class SettingsFragment : Fragment() {
                                         android.util.Log.e("SettingsFragment", "Error scrolling logcat", e)
                                     }
                                 }
+
+    private fun setupLivePreviewToggle() {
+        val previewSwitch = binding.root.findViewById<android.widget.Switch>(R.id.show_live_preview_toggle)
+        previewSwitch?.isChecked = settingsManager.showLivePreview
+        previewSwitch?.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager.showLivePreview = isChecked
+            applyLivePreviewVisibility(isChecked)
+            LogcatManager.addLog("Live camera preview: ${if (isChecked) "shown" else "hidden"}", "Settings")
+        }
+    }
+
                             }
                         } catch (e: Exception) {
                             android.util.Log.e("SettingsFragment", "Error updating logcat text", e)
@@ -142,6 +153,7 @@ class SettingsFragment : Fragment() {
         setupEyePositionEffects()
         setupDistanceMultipliers()
         setupWakeLockToggle()
+        setupLivePreviewToggle()
         setupBlinkDetection()
         setupCursorTheming()
         setupCursorUpdateSettings()
@@ -161,6 +173,9 @@ class SettingsFragment : Fragment() {
             val isEnabled = com.qali.iris.CameraForegroundService.getWakeLockState()
             val switch = it.root.findViewById<android.widget.Switch>(R.id.wake_lock_toggle)
             switch?.isChecked = isEnabled
+            
+            val previewSwitch = it.root.findViewById<android.widget.Switch>(R.id.show_live_preview_toggle)
+            previewSwitch?.isChecked = settingsManager.showLivePreview
         }
         
         // Update color previews from settings
@@ -173,6 +188,7 @@ class SettingsFragment : Fragment() {
         
         // Apply cursor colors when settings resume
         applyCursorColors()
+        applyLivePreviewVisibility(settingsManager.showLivePreview)
         
         // Register logcat listener only if view is created
         try {
@@ -728,7 +744,17 @@ class SettingsFragment : Fragment() {
             }
         }
     }
-    
+
+    private fun setupLivePreviewToggle() {
+        val previewSwitch = binding.root.findViewById<android.widget.Switch>(R.id.show_live_preview_toggle)
+        previewSwitch?.isChecked = settingsManager.showLivePreview
+        previewSwitch?.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager.showLivePreview = isChecked
+            applyLivePreviewVisibility(isChecked)
+            LogcatManager.addLog("Live camera preview: ${if (isChecked) "shown" else "hidden"}", "Settings")
+        }
+    }
+
     private fun setupBlinkDetection() {
         // Setup blink threshold
         setupValueEditor(
@@ -899,6 +925,16 @@ class SettingsFragment : Fragment() {
             }
         } catch (e: Exception) {
             android.util.Log.e("SettingsFragment", "Error applying cursor colors: ${e.message}", e)
+        }
+    }
+
+    private fun applyLivePreviewVisibility(show: Boolean) {
+        try {
+            val cameraFragment = parentFragmentManager.findFragmentByTag("CameraFragment")
+                ?: parentFragmentManager.fragments.firstOrNull { it is CameraFragment }
+            (cameraFragment as? CameraFragment)?.setLivePreviewVisible(show)
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsFragment", "Error applying live preview visibility: ${e.message}", e)
         }
     }
     

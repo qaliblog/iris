@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 
 /**
@@ -15,6 +17,7 @@ class PointerView(context: Context) : View(context) {
     private var clickEndTime = 0L
     private val CLICK_COLOR_DURATION_MS = 200L // Show click color for 200ms
     private var isDragging = false
+    private val mainHandler = Handler(Looper.getMainLooper())
     
     // Default colors: blue for cursor, green for click
     private var cursorColor: Int = Color.BLUE
@@ -82,13 +85,29 @@ class PointerView(context: Context) : View(context) {
     }
     
     fun indicateDragStart() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            startDragAnimation()
+        } else {
+            mainHandler.post { startDragAnimation() }
+        }
+    }
+
+    fun indicateDragEnd() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            endDragAnimation()
+        } else {
+            mainHandler.post { endDragAnimation() }
+        }
+    }
+
+    private fun startDragAnimation() {
         isDragging = true
         updatePaintColors()
         animate().scaleX(1.2f).scaleY(1.2f).setDuration(100).start()
         invalidate()
     }
 
-    fun indicateDragEnd() {
+    private fun endDragAnimation() {
         isDragging = false
         updatePaintColors()
         animate().scaleX(1f).scaleY(1f).setDuration(100).start()
