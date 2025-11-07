@@ -416,7 +416,6 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
     /**  Accessibility permission handling (fixed compile errors)      */
     /** --------------------------------------------------------------- */
     private fun checkAccessibilityPermission(showPrompt: Boolean = true) {
-        // Fast-path: service already running
         if (MouseControlService.getInstance() != null) {
             LogcatManager.addLog("MouseControlService instance found - service is running", "Camera")
             isMouseControlEnabled = true
@@ -435,12 +434,19 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
                     Toast.LENGTH_LONG
                 ).show()
     
-                // CORRECT constant + API 30+ guard for 'data'
                 val component = ComponentName(requireContext(), MouseControlService::class.java)
-                val detailsIntent = Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS).apply {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) { // API 30+
-                        data = Uri.parse("package:${component.packageName}/${component.className}")
+    
+                // Use reflection or safe intent creation for API 30+
+                val detailsIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
+                        intent.data = Uri.parse("package:${component.packageName}/${component.className}")
+                        intent
+                    } catch (e: Exception) {
+                        Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     }
+                } else {
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                 }
     
                 val resolved = detailsIntent.resolveActivity(requireContext().packageManager)
