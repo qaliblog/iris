@@ -129,7 +129,26 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             initialBlinkThreshold = settingsManager!!.blinkThreshold,
             initialHalfBlinkAccelThreshold = settingsManager!!.halfBlinkAccelThreshold,
             initialClickDelayThreshold = settingsManager!!.clickDelayThreshold
-        )
+        ).apply {
+            onTap = { position ->
+                MouseControlService.performClick()
+                PointerOverlayService.indicateClick()
+                LogcatManager.addLog(
+                    "Service: Full blink detected at (${position.x.toInt()}, ${position.y.toInt()})",
+                    "Service"
+                )
+            }
+            onDragStart = {
+                MouseControlService.startDrag()
+                PointerOverlayService.indicateDragStart()
+                LogcatManager.addLog("Service: Half-blink → drag start", "Service")
+            }
+            onDragEnd = {
+                MouseControlService.endDrag()
+                PointerOverlayService.indicateDragEnd()
+                LogcatManager.addLog("Service: Half-blink → drag end", "Service")
+            }
+        }
         
         // Set SettingsManager in MouseControlService for cursor update configuration
         MouseControlService.registerOnServiceConnected(mouseServiceReconnectListener)
@@ -379,12 +398,10 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             eyeBlinkDetector?.setClickDelayThreshold(settingsManager?.clickDelayThreshold ?: 200L)
             
             // Detect blink using eyelid landmarks (preferred) or fallback to eye area
-            val blinkDetected = if (trackingResult.leftEyelidLandmarks != null || trackingResult.rightEyelidLandmarks != null) {
-                // Use eyelid landmarks for more accurate detection
+            if (trackingResult.leftEyelidLandmarks != null || trackingResult.rightEyelidLandmarks != null) {
                 val combinedEyelid = if (settingsManager?.useOneEyeDetection == true) {
                     trackingResult.rightEyelidLandmarks ?: trackingResult.leftEyelidLandmarks
                 } else {
-                    // Average both eyes
                     when {
                         trackingResult.leftEyelidLandmarks != null && trackingResult.rightEyelidLandmarks != null -> {
                             EyeTracker.EyelidLandmarks(
@@ -397,28 +414,16 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                         else -> null
                     }
                 }
-                
-                if (combinedEyelid != null) {
-                    // Pass click position for relative calculations
-                    val clickPosition = android.graphics.PointF(adjustedX, adjustedY)
+
+                combinedEyelid?.let {
                     eyeBlinkDetector?.processEyelidLandmarks(
-                        upperLidY = combinedEyelid.upperLidY,
-                        lowerLidY = combinedEyelid.lowerLidY,
-                        clickPosition = clickPosition
-                    ) ?: false
-                } else {
-                    false
+                        upperLidY = it.upperLidY,
+                        lowerLidY = it.lowerLidY,
+                        clickPosition = android.graphics.PointF(adjustedX, adjustedY)
+                    )
                 }
             } else {
-                // Fallback to eye area method
-                eyeBlinkDetector?.processEyeArea(trackingResult.eyeArea) ?: false
-            }
-            if (blinkDetected) {
-                // Trigger click
-                MouseControlService.performClick()
-                PointerOverlayService.indicateClick()
-                // Note: Click dot drawing in OverlayView is handled by CameraFragment when visible
-                LogcatManager.addLog("Blink click detected at (${adjustedX.toInt()}, ${adjustedY.toInt()})", "Service")
+                eyeBlinkDetector?.processEyeArea(trackingResult.eyeArea)
             }
             
             // Service always updates pointer in background (regardless of cursor movement flag)

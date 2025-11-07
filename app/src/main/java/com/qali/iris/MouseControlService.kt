@@ -118,7 +118,7 @@ class MouseControlService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 
-    override fun onGesture(gestureDescription: GestureDescription?): Boolean = false
+    override fun onGesture(gestureId: Int): Boolean = false
 
     private fun ensureServiceEnabled(): Boolean {
         return if (isAccessibilityServiceEnabled(this)) true

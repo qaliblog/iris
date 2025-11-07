@@ -51,12 +51,21 @@ class EyeBlinkDetector(
         while (history.isNotEmpty() && now - history.first().time > 500) history.removeFirst()
 
         if (history.size >= 3 && now - lastActionTime >= 250) {
-            val s1 = history[history.size - 3]; val s2 = history[history.size - 2]; val s3 = history[history.size - 1]
-            val closingAccel = s2.acceleration; val openingAccel = s3.acceleration
-            val closed = s2.openness < (1f - blinkThreshold); val opened = s3.openness > closed + 0.15f
+            val s1 = history[history.size - 3]
+            val s2 = history[history.size - 2]
+            val s3 = history[history.size - 1]
+            val closingAccel = s2.acceleration
+            val openingAccel = s3.acceleration
+            val closeThreshold = 1f - blinkThreshold
+            val reopenThreshold = (closeThreshold + 0.15f).coerceAtMost(1f)
 
-            if (closingAccel < -blinkThreshold && openingAccel > blinkThreshold * 0.6f && closed && opened) {
-                lastActionTime = now; onTap?.invoke(clickPosition); return
+            val closed = s2.openness < closeThreshold
+            val reopened = s3.openness > reopenThreshold
+
+            if (closingAccel < -blinkThreshold && openingAccel > blinkThreshold * 0.6f && closed && reopened) {
+                lastActionTime = now
+                onTap?.invoke(clickPosition)
+                return
             }
         }
 
