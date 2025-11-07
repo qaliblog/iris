@@ -427,23 +427,22 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         if (!enabled) {
             LogcatManager.addLog("Accessibility service not enabled", "Camera")
             isMouseControlEnabled = false
-
+    
             if (showPrompt && isResumed && isAdded) {
                 Toast.makeText(
                     requireContext(),
                     "Please enable accessibility service for mouse control",
                     Toast.LENGTH_LONG
                 ).show()
-
-                // ----- FIXED PART -------------------------------------------------
+    
+                // === FIXED: Use correct constant and guard 'data' ===
                 val component = ComponentName(requireContext(), MouseControlService::class.java)
                 val detailsIntent = Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS).apply {
-                    // `data` is only available on API 30+
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) { // API 30+
                         data = Uri.parse("package:${component.packageName}/${component.className}")
                     }
                 }
-
+    
                 val resolved = detailsIntent.resolveActivity(requireContext().packageManager)
                 if (resolved != null) {
                     startActivity(detailsIntent)
@@ -452,7 +451,6 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
                     startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     LogcatManager.addLog("Opened accessibility settings (fallback)", "Camera")
                 }
-                // -----------------------------------------------------------------
             }
         } else {
             LogcatManager.addLog("Accessibility service is enabled and ready", "Camera")
