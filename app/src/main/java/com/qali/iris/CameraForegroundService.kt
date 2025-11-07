@@ -441,11 +441,6 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         Log.e(TAG, "FaceLandmarkerHelper error: $error (code: $errorCode)")
         LogcatManager.addLog("MediaPipe error: $error", "Service")
     }
-
-    override fun onDestroy() {
-        MouseControlService.unregisterOnServiceConnected(mouseServiceReconnectListener)
-        super.onDestroy()
-    }
     
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -576,8 +571,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     }
     
     override fun onDestroy() {
-        super.onDestroy()
-        instance = null
+        MouseControlService.unregisterOnServiceConnected(mouseServiceReconnectListener)
         
         // Release camera
         cameraProvider?.unbindAll()
@@ -600,5 +594,8 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         backgroundExecutor.shutdown()
         
         LogcatManager.addLog("Background service stopped", "Service")
+        
+        super.onDestroy()
+        instance = null
     }
 }
