@@ -435,17 +435,24 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
                 ).show()
     
                 val component = ComponentName(requireContext(), MouseControlService::class.java)
+                val packageName = component.packageName
+                val className = component.className
     
-                // Use reflection or safe intent creation for API 30+
-                val detailsIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    try {
-                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
-                        intent.data = Uri.parse("package:${component.packageName}/${component.className}")
+                // Use reflection to avoid compile-time dependency on API 30+
+                val detailsIntent = try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        val settingsClass = Settings::class.java
+                        val actionField = settingsClass.getField("ACTION_ACCESSIBILITY_DETAILS_SETTINGS")
+                        val action = actionField.get(null) as String
+    
+                        val intent = Intent(action)
+                        val uri = Uri.parse("package:$packageName/$className")
+                        intent.data = uri
                         intent
-                    } catch (e: Exception) {
+                    } else {
                         Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     }
-                } else {
+                } catch (e: Exception) {
                     Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                 }
     
