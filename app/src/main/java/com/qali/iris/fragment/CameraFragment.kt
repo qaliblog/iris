@@ -604,16 +604,13 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         }
 
         try {
-            // Bind camera to ProcessLifecycleOwner to keep it running even when activity pauses
-            // ProcessLifecycleOwner represents the entire application lifecycle, not just one activity
-            // This ensures camera continues in background - critical for continuous cursor control
-            // Wake lock ensures CPU stays awake for MediaPipe processing
-            val lifecycleOwner = androidx.lifecycle.ProcessLifecycleOwner.get()
+            // Bind camera to this Fragment's lifecycle so it releases on pause
+            // The background service will rebind its own ImageAnalysis for background processing
             camera = cameraProvider.bindToLifecycle(
-                lifecycleOwner, cameraSelector, preview, imageAnalyzer
+                this, cameraSelector, preview, imageAnalyzer
             )
             
-            LogcatManager.addLog("Camera bound to ProcessLifecycleOwner - will continue in background", "Camera")
+            LogcatManager.addLog("Camera bound to Fragment lifecycle (releases on pause)", "Camera")
 
             // Attach the viewfinder's surface provider to preview use case
             // Ensure viewFinder is properly initialized before setting surface provider

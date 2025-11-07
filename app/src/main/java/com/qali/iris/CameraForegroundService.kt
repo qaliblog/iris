@@ -247,6 +247,12 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     private fun bindCameraInService() {
         cameraProvider?.let { provider ->
             try {
+                // Ensure previous bindings are released so service can take over
+                try {
+                    provider.unbindAll()
+                } catch (_: Exception) {
+                    // Ignore
+                }
                 // Use front camera
                 val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                 
@@ -289,6 +295,9 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             if (camera == null && cameraProvider != null && imageAnalysis != null) {
                 Log.d(TAG, "Rebinding camera in service after fragment release")
                 LogcatManager.addLog("Service: Rebinding camera for background processing", "Service")
+                try {
+                    cameraProvider?.unbindAll()
+                } catch (_: Exception) {}
                 bindCameraInService()
             } else {
                 Log.d(TAG, "Cannot rebind camera - camera: ${camera != null}, provider: ${cameraProvider != null}, analyzer: ${imageAnalysis != null}")
