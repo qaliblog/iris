@@ -32,11 +32,26 @@ class PointerOverlayService : Service() {
         fun getInstance(): PointerOverlayService? = instance
         
         fun updatePointerPosition(x: Float, y: Float) {
-            instance?.updatePointer(x, y)
+            instance?.let { service ->
+                if (x < 0 || y < 0) {
+                    service.hidePointer()
+                } else {
+                    service.pointerView?.visibility = View.VISIBLE
+                    service.updatePointer(x, y)
+                }
+            }
         }
         
         fun indicateClick() {
             instance?.pointerView?.indicateClick()
+        }
+
+        fun indicateDragStart() {
+            instance?.pointerView?.indicateDragStart()
+        }
+
+        fun indicateDragEnd() {
+            instance?.pointerView?.indicateDragEnd()
         }
     }
     

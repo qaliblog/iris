@@ -80,7 +80,7 @@ class SettingsManager(context: Context) {
     // Lower = more sensitive to partial blinks, higher = requires more acceleration
     var halfBlinkAccelThreshold: Float
         get() = prefs.getFloat(KEY_HALF_BLINK_ACCEL_THRESHOLD, 0.15f)
-        set(value) = prefs.edit().putFloat(KEY_HALF_BLINK_ACCEL_THRESHOLD, value.coerceIn(0.05f, 1.0f)).apply()
+        set(value) = prefs.edit().putFloat(KEY_HALF_BLINK_ACCEL_THRESHOLD, value.coerceIn(0.05f, 0.5f)).apply()
     
     // Click delay threshold in milliseconds (default 200ms)
     // Time to account for previous click position when detecting new clicks

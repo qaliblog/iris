@@ -503,7 +503,21 @@
             android:layout_marginTop="16dp"
             android:layout_marginBottom="8dp" />
 
-        <!-- Blink Threshold -->
+          <!-- Blink Threshold -->
+          <SeekBar
+              android:id="@+id/seek_full_blink"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:max="100" />
+
+          <TextView
+              android:id="@+id/tv_full_blink"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:text="Full-blink (Tap): 0.30"
+              android:textSize="14sp"
+              android:padding="8dp" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -567,7 +581,21 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
-        <!-- Half-Blink Acceleration Threshold -->
+          <!-- Half-Blink Acceleration Threshold -->
+          <SeekBar
+              android:id="@+id/seek_half_blink"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:max="100" />
+
+          <TextView
+              android:id="@+id/tv_half_blink"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:text="Half-blink (Drag): 0.15"
+              android:textSize="14sp"
+              android:padding="8dp" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

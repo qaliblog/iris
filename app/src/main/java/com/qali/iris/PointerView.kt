@@ -14,6 +14,7 @@ class PointerView(context: Context) : View(context) {
     private var isClicking = false
     private var clickEndTime = 0L
     private val CLICK_COLOR_DURATION_MS = 200L // Show click color for 200ms
+    private var isDragging = false
     
     // Default colors: blue for cursor, green for click
     private var cursorColor: Int = Color.BLUE
@@ -80,11 +81,26 @@ class PointerView(context: Context) : View(context) {
         }, CLICK_COLOR_DURATION_MS)
     }
     
+    fun indicateDragStart() {
+        isDragging = true
+        updatePaintColors()
+        animate().scaleX(1.2f).scaleY(1.2f).setDuration(100).start()
+        invalidate()
+    }
+
+    fun indicateDragEnd() {
+        isDragging = false
+        updatePaintColors()
+        animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+        invalidate()
+    }
+
     private fun updatePaintColors() {
         val color = if (isClicking) clickColor else cursorColor
         pointerPaint.color = color
         centerPaint.color = color
         outerPaint.color = color
+        outerPaint.alpha = if (isDragging) 255 else 128
     }
     
     override fun onDraw(canvas: Canvas) {

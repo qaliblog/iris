@@ -15,6 +15,8 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.SeekBar
+import android.widget.TextView
 import com.qali.iris.LogcatManager
 import com.qali.iris.PointerOverlayService
 import com.qali.iris.R
@@ -22,7 +24,6 @@ import com.qali.iris.SettingsManager
 import com.qali.iris.databinding.FragmentSettingsBinding
 import com.qali.iris.fragment.CameraFragment
 import java.text.DecimalFormat
-import java.util.Locale
 
 class SettingsFragment : Fragment() {
     
@@ -31,6 +32,10 @@ class SettingsFragment : Fragment() {
     private lateinit var settingsManager: SettingsManager
     private val df = DecimalFormat("#.##")
     private var isLogcatVisible = false
+    private var seekFullBlink: SeekBar? = null
+    private var tvFullBlink: TextView? = null
+    private var seekHalfBlink: SeekBar? = null
+    private var tvHalfBlink: TextView? = null
     private val logcatUpdateListener: (String) -> Unit = { logText ->
         // Safely access binding - it might be null if fragment view is destroyed
         // Ensure we're on main thread
@@ -79,6 +84,41 @@ class SettingsFragment : Fragment() {
         
         settingsManager = SettingsManager(requireContext())
         
+        seekFullBlink = view.findViewById(R.id.seek_full_blink)
+        tvFullBlink = view.findViewById(R.id.tv_full_blink)
+        seekHalfBlink = view.findViewById(R.id.seek_half_blink)
+        tvHalfBlink = view.findViewById(R.id.tv_half_blink)
+
+        seekFullBlink?.apply {
+            progress = (settingsManager.blinkThreshold * 100).toInt()
+            tvFullBlink?.text = "Full-blink (Tap): ${"%.2f".format(settingsManager.blinkThreshold)}"
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val value = (progress / 100f).coerceIn(0.05f, 0.8f)
+                    settingsManager.blinkThreshold = value
+                    tvFullBlink?.text = "Full-blink (Tap): ${"%.2f".format(value)}"
+                    updateValue(binding.blinkThresholdValue, value)
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            })
+        }
+
+        seekHalfBlink?.apply {
+            progress = (settingsManager.halfBlinkAccelThreshold * 100).toInt()
+            tvHalfBlink?.text = "Half-blink (Drag): ${"%.2f".format(settingsManager.halfBlinkAccelThreshold)}"
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val value = (progress / 100f).coerceIn(0.05f, 0.5f)
+                    settingsManager.halfBlinkAccelThreshold = value
+                    tvHalfBlink?.text = "Half-blink (Drag): ${"%.2f".format(value)}"
+                    updateValue(binding.halfBlinkAccelThresholdValue, value)
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            })
+        }
+
         // Setup back button - ensure it works reliably
         binding.backButton.setOnClickListener {
             try {
@@ -113,6 +153,8 @@ class SettingsFragment : Fragment() {
         
         // Disable cursor movement when settings are visible
         CameraFragment.setCursorMovementEnabled(false)
+        PointerOverlayService.updatePointerPosition(-1f, -1f)
+        LogcatManager.addLog("Settings opened → cursor DISABLED", "Settings")
         
         // Update wake lock toggle state in case it changed
         _binding?.let {
@@ -149,6 +191,7 @@ class SettingsFragment : Fragment() {
         
         // Re-enable cursor movement when settings are closed
         CameraFragment.setCursorMovementEnabled(true)
+        LogcatManager.addLog("Settings closed → cursor ENABLED", "Settings")
         
         // Unregister logcat listener
         try {
@@ -163,6 +206,10 @@ class SettingsFragment : Fragment() {
         
         // Re-enable cursor movement when settings view is destroyed
         CameraFragment.setCursorMovementEnabled(true)
+        seekFullBlink = null
+        tvFullBlink = null
+        seekHalfBlink = null
+        tvHalfBlink = null
         
         _binding = null
     }
@@ -689,6 +736,8 @@ class SettingsFragment : Fragment() {
             { settingsManager.blinkThreshold },
             { 
                 settingsManager.blinkThreshold = it
+                seekFullBlink?.progress = (settingsManager.blinkThreshold * 100).toInt()
+                tvFullBlink?.text = "Full-blink (Tap): ${"%.2f".format(settingsManager.blinkThreshold)}"
                 // Update blink detector in CameraFragment if possible
                 // We'll need to add a way to update it
                 LogcatManager.addLog("Blink threshold updated: ${df.format(it)}", "Settings")
@@ -702,6 +751,8 @@ class SettingsFragment : Fragment() {
             val newValue = (settingsManager.blinkThreshold - 0.05f).coerceIn(0.05f, 0.8f)
             settingsManager.blinkThreshold = newValue
             updateValue(binding.blinkThresholdValue, newValue)
+            seekFullBlink?.progress = (newValue * 100).toInt()
+            tvFullBlink?.text = "Full-blink (Tap): ${"%.2f".format(newValue)}"
             LogcatManager.addLog("Blink threshold: ${df.format(newValue)}", "Settings")
         }
         
@@ -710,6 +761,8 @@ class SettingsFragment : Fragment() {
             val newValue = (settingsManager.blinkThreshold + 0.05f).coerceIn(0.05f, 0.8f)
             settingsManager.blinkThreshold = newValue
             updateValue(binding.blinkThresholdValue, newValue)
+            seekFullBlink?.progress = (newValue * 100).toInt()
+            tvFullBlink?.text = "Full-blink (Tap): ${"%.2f".format(newValue)}"
             LogcatManager.addLog("Blink threshold: ${df.format(newValue)}", "Settings")
         }
         
@@ -727,6 +780,8 @@ class SettingsFragment : Fragment() {
             { settingsManager.halfBlinkAccelThreshold },
             { 
                 settingsManager.halfBlinkAccelThreshold = it
+                seekHalfBlink?.progress = (settingsManager.halfBlinkAccelThreshold * 100).toInt()
+                tvHalfBlink?.text = "Half-blink (Drag): ${"%.2f".format(settingsManager.halfBlinkAccelThreshold)}"
                 // Update blink detector in CameraFragment and service if possible
                 LogcatManager.addLog("Half-blink acceleration threshold updated: ${df.format(it)}", "Settings")
             },
@@ -736,17 +791,21 @@ class SettingsFragment : Fragment() {
         
         binding.halfBlinkAccelThresholdMinus.setOnClickListener {
             binding.halfBlinkAccelThresholdValue.clearFocus()
-            val newValue = (settingsManager.halfBlinkAccelThreshold - 0.01f).coerceIn(0.05f, 1.0f)
+            val newValue = (settingsManager.halfBlinkAccelThreshold - 0.01f).coerceIn(0.05f, 0.5f)
             settingsManager.halfBlinkAccelThreshold = newValue
             updateValue(binding.halfBlinkAccelThresholdValue, newValue)
+            seekHalfBlink?.progress = (newValue * 100).toInt()
+            tvHalfBlink?.text = "Half-blink (Drag): ${"%.2f".format(newValue)}"
             LogcatManager.addLog("Half-blink acceleration threshold: ${df.format(newValue)}", "Settings")
         }
         
         binding.halfBlinkAccelThresholdPlus.setOnClickListener {
             binding.halfBlinkAccelThresholdValue.clearFocus()
-            val newValue = (settingsManager.halfBlinkAccelThreshold + 0.01f).coerceIn(0.05f, 1.0f)
+            val newValue = (settingsManager.halfBlinkAccelThreshold + 0.01f).coerceIn(0.05f, 0.5f)
             settingsManager.halfBlinkAccelThreshold = newValue
             updateValue(binding.halfBlinkAccelThresholdValue, newValue)
+            seekHalfBlink?.progress = (newValue * 100).toInt()
+            tvHalfBlink?.text = "Half-blink (Drag): ${"%.2f".format(newValue)}"
             LogcatManager.addLog("Half-blink acceleration threshold: ${df.format(newValue)}", "Settings")
         }
         
