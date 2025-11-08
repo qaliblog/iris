@@ -99,7 +99,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     // Custom lifecycle owner for service (required for camera binding in foreground service)
     private val serviceLifecycleOwner = object : LifecycleOwner {
         private val lifecycleRegistry = LifecycleRegistry(this)
-        override fun getLifecycle() = lifecycleRegistry
+        override val lifecycle: Lifecycle = lifecycleRegistry
     }.apply {
         lifecycle.currentState = androidx.lifecycle.Lifecycle.State.STARTED
     }
@@ -223,26 +223,34 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         }
         
         // Start as foreground service with proper service type for Android 10+
+        // Note: Service type is declared in manifest, which is sufficient for Android 10-13
+        // For Android 14+, we need to specify it in startForeground if available
         try {
             val notification = createNotification()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 // Android 14+ requires service type to be specified in startForeground
-                ServiceCompat.startForeground(
-                    this,
-                    NOTIFICATION_ID,
-                    notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                )
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Android 10+ supports foreground service types
-                ServiceCompat.startForeground(
-                    this,
-                    NOTIFICATION_ID,
-                    notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                )
+                // Use reflection to call startForeground with service type if available
+                try {
+                    val method = Service::class.java.getMethod(
+                        "startForeground",
+                        Int::class.javaPrimitiveType,
+                        Notification::class.java,
+                        Int::class.javaPrimitiveType
+                    )
+                    method.invoke(
+                        this,
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    )
+                    Log.d(TAG, "Foreground service started with service type (Android 14+)")
+                } catch (e: NoSuchMethodException) {
+                    // Fallback to regular startForeground
+                    startForeground(NOTIFICATION_ID, notification)
+                    Log.d(TAG, "Using regular startForeground (service type method not available)")
+                }
             } else {
-                // Android 7-9: regular foreground service
+                // Android 7-13: regular foreground service (service type in manifest is sufficient)
                 startForeground(NOTIFICATION_ID, notification)
             }
             Log.d(TAG, "Foreground service started with notification (Android ${Build.VERSION.SDK_INT})")
@@ -451,22 +459,26 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             try {
                 val notification = createNotification()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    // Android 14+ requires service type
-                    ServiceCompat.startForeground(
-                        this,
-                        NOTIFICATION_ID,
-                        notification,
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                    )
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    // Android 10+ supports service types
-                    ServiceCompat.startForeground(
-                        this,
-                        NOTIFICATION_ID,
-                        notification,
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                    )
+                    // Android 14+ requires service type to be specified in startForeground
+                    try {
+                        val method = Service::class.java.getMethod(
+                            "startForeground",
+                            Int::class.javaPrimitiveType,
+                            Notification::class.java,
+                            Int::class.javaPrimitiveType
+                        )
+                        method.invoke(
+                            this,
+                            NOTIFICATION_ID,
+                            notification,
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                        )
+                    } catch (e: NoSuchMethodException) {
+                        // Fallback to regular startForeground
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
                 } else {
+                    // Android 7-13: regular foreground service
                     startForeground(NOTIFICATION_ID, notification)
                 }
             } catch (e: Exception) {
@@ -709,20 +721,26 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         try {
             val notification = createNotification()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceCompat.startForeground(
-                    this,
-                    NOTIFICATION_ID,
-                    notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                )
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                ServiceCompat.startForeground(
-                    this,
-                    NOTIFICATION_ID,
-                    notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                )
+                // Android 14+ requires service type to be specified in startForeground
+                try {
+                    val method = Service::class.java.getMethod(
+                        "startForeground",
+                        Int::class.javaPrimitiveType,
+                        Notification::class.java,
+                        Int::class.javaPrimitiveType
+                    )
+                    method.invoke(
+                        this,
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    )
+                } catch (e: NoSuchMethodException) {
+                    // Fallback to regular startForeground
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             } else {
+                // Android 7-13: regular foreground service
                 startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
