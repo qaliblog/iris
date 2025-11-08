@@ -27,6 +27,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.navigation.Navigation
 import com.qali.iris.EyeBlinkDetector
 import com.qali.iris.EyeTracker
+import com.qali.iris.EyeTrackingAccessibilityService
 import com.qali.iris.FaceLandmarkerHelper
 import com.qali.iris.LogcatManager
 import com.qali.iris.MainViewModel
