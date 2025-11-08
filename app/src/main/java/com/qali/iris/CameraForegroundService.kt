@@ -81,6 +81,14 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             }
             return false
         }
+        
+        /**
+         * Check if overlay (pointer) is visible
+         * Required for Android 15+ camera access in background
+         */
+        fun isOverlayVisible(): Boolean {
+            return PointerOverlayService.getInstance()?.pointerView?.visibility == android.view.View.VISIBLE
+        }
     }
     
     private var wakeLock: PowerManager.WakeLock? = null
@@ -377,7 +385,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 val isForeground = isAppInForeground(this)
                 val isAndroid11Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                 val isAndroid15Plus = Build.VERSION.SDK_INT >= 35 // Android 15 (API 35)
-                val isOverlayVisible = isOverlayVisible()
+                val isOverlayVisible = Companion.isOverlayVisible()
                 
                 // Android 15: Camera access in background requires overlay to be visible
                 if (isAndroid15Plus && !isForeground && !isOverlayVisible) {
