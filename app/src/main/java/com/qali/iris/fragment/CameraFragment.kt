@@ -166,16 +166,28 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
     }
 
     override fun onDestroyView() {
-        cameraProvider?.unbindAll()
+        try {
+            cameraProvider?.unbindAll()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error unbinding camera in onDestroyView: ${e.message}")
+        }
         camera = null
         imageAnalyzer = null
         preview = null
-        CameraForegroundService.getInstance()?.rebindCameraIfNeeded()
+        
+        // Delay rebind to ensure fragment's unbind completes
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            CameraForegroundService.getInstance()?.rebindCameraIfNeeded()
+        }, 500)
 
         _binding = null
         super.onDestroyView()
 
-        backgroundExecutor.shutdown()
+        try {
+            backgroundExecutor.shutdown()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error shutting down executor: ${e.message}")
+        }
         mouseServiceOnConnected?.let { MouseControlService.unregisterOnServiceConnected(it) }
         mouseServiceOnConnected = null
     }

@@ -131,7 +131,20 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         }
         
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        // Create notification channel BEFORE creating notification
+        // This is critical for startForeground() to work
         createNotificationChannel()
+        
+        // Verify channel was created
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = notificationManager?.getNotificationChannel(CHANNEL_ID)
+            if (channel == null) {
+                Log.e(TAG, "Notification channel was not created! This will cause startForeground() to fail.")
+                LogcatManager.addLog("ERROR: Notification channel missing - foreground service will fail", "Service")
+            } else {
+                Log.d(TAG, "Notification channel verified: ${channel.id}")
+            }
+        }
         
         // Acquire wake lock
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -217,13 +230,15 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         }
         
         // Start as foreground service with proper service type for Android 10+
-        // Note: Service type is declared in manifest, which is sufficient for Android 10-13
-        // For Android 14+, we need to specify it in startForeground if available
+        // CRITICAL: Must create notification BEFORE calling startForeground()
         try {
             val notification = createNotification()
+            if (notification == null) {
+                throw IllegalStateException("Notification is null - cannot start foreground service")
+            }
+            
+            // Android 14+ (API 34+) requires service type in startForeground()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                // Android 14+ requires service type to be specified in startForeground
-                // Use reflection to call startForeground with service type if available
                 try {
                     val method = Service::class.java.getMethod(
                         "startForeground",
@@ -237,26 +252,46 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                         notification,
                         android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
                     )
-                    Log.d(TAG, "Foreground service started with service type (Android 14+)")
+                    Log.d(TAG, "Foreground service started with service type (Android ${Build.VERSION.SDK_INT})")
+                    LogcatManager.addLog("Foreground service started successfully (Android ${Build.VERSION.SDK_INT})", "Service")
                 } catch (e: NoSuchMethodException) {
-                    // Fallback to regular startForeground
+                    // Fallback to regular startForeground for older Android 14 builds
                     startForeground(NOTIFICATION_ID, notification)
                     Log.d(TAG, "Using regular startForeground (service type method not available)")
+                    LogcatManager.addLog("Foreground service started (fallback method)", "Service")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start foreground with service type: ${e.message}", e)
+                    // Try fallback
+                    startForeground(NOTIFICATION_ID, notification)
+                    LogcatManager.addLog("Foreground service started (fallback after error)", "Service")
                 }
             } else {
                 // Android 7-13: regular foreground service (service type in manifest is sufficient)
                 startForeground(NOTIFICATION_ID, notification)
+                Log.d(TAG, "Foreground service started (Android ${Build.VERSION.SDK_INT})")
+                LogcatManager.addLog("Foreground service started successfully", "Service")
             }
-            Log.d(TAG, "Foreground service started with notification (Android ${Build.VERSION.SDK_INT})")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start foreground service: ${e.message}", e)
-            LogcatManager.addLog("Failed to start foreground service: ${e.message}", "Service")
-            // Don't stop self - try to continue without foreground (may work on older Android)
+            Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
+            LogcatManager.addLog("CRITICAL: Failed to start foreground service: ${e.message}", "Service")
+            
+            // Last resort: try simple startForeground without notification validation
             try {
-                startForeground(NOTIFICATION_ID, createNotification())
+                val simpleNotification = NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("iris Background Service")
+                    .setContentText("Eye tracking active")
+                    .setSmallIcon(android.R.drawable.ic_menu_camera)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .build()
+                startForeground(NOTIFICATION_ID, simpleNotification)
+                Log.w(TAG, "Foreground service started with fallback notification")
+                LogcatManager.addLog("Foreground service started with fallback notification", "Service")
             } catch (e2: Exception) {
-                Log.e(TAG, "Fallback foreground start also failed: ${e2.message}", e2)
-                stopSelf()
+                Log.e(TAG, "All foreground start attempts failed: ${e2.message}", e2)
+                LogcatManager.addLog("FATAL: Cannot start foreground service - stopping", "Service")
+                // Don't stop self - let it try to continue (may work on some devices)
+                // stopSelf() would prevent any recovery
             }
         }
     }
@@ -333,33 +368,44 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     /**
      * Bind camera in service for background processing
      * This ensures camera processing continues even when fragment is paused/closed
-     * Handles Android 11+ camera restrictions properly
+     * Handles Android 11+ and Android 15 camera restrictions properly
      */
     private fun bindCameraInService() {
         cameraProvider?.let { provider ->
             try {
-                // Check Android 11+ camera restrictions
+                // Check Android version and restrictions
                 val isForeground = isAppInForeground(this)
                 val isAndroid11Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                val isAndroid15Plus = Build.VERSION.SDK_INT >= 35 // Android 15 (API 35)
+                val isOverlayVisible = Companion.isOverlayVisible()
                 
-                if (isAndroid11Plus && !isForeground) {
-                    // Android 11+: Camera access in background is restricted
-                    // We can still try, but it may fail - that's expected behavior
-                    Log.d(TAG, "Attempting camera bind in background (Android 11+) - may be restricted")
-                    LogcatManager.addLog("Service: Attempting camera bind in background (Android 11+ restriction)", "Service")
+                // Android 15: Camera access in background requires overlay to be visible
+                if (isAndroid15Plus && !isForeground && !isOverlayVisible) {
+                    Log.d(TAG, "Android 15: Cannot bind camera - app in background and overlay not visible")
+                    LogcatManager.addLog("Service: Android 15 restriction - overlay not visible", "Service")
+                    scheduleRetryWhenForeground()
+                    return
+                }
+                
+                // Android 11-14: Camera access in background is restricted
+                if (isAndroid11Plus && !isAndroid15Plus && !isForeground) {
+                    Log.d(TAG, "Attempting camera bind in background (Android 11-14) - may be restricted")
+                    LogcatManager.addLog("Service: Attempting camera bind in background (Android 11-14 restriction)", "Service")
                 }
                 
                 // Ensure previous bindings are released so service can take over
                 try {
                     provider.unbindAll()
-                    // Small delay to ensure unbind completes
+                    // Small delay to ensure unbind completes (critical for proper handoff)
                     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                         tryBindCamera(provider)
-                    }, 100)
+                    }, 200) // Increased delay for more reliable handoff
                 } catch (e: Exception) {
                     Log.w(TAG, "Error during unbindAll: ${e.message}")
-                    // Try binding anyway
-                    tryBindCamera(provider)
+                    // Try binding anyway after a short delay
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        tryBindCamera(provider)
+                    }, 200)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in bindCameraInService: ${e.message}", e)
@@ -425,21 +471,112 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     
     /**
      * Rebind camera in service - called when fragment releases camera
+     * Handles Android 11+ and Android 15 restrictions with retry logic
      */
     fun rebindCameraIfNeeded() {
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            if (camera == null && cameraProvider != null && imageAnalysis != null) {
-                Log.d(TAG, "Rebinding camera in service after fragment release")
+        cameraRebindHandler.removeCallbacks(rebindRunnable)
+        
+        rebindRunnable = Runnable {
+            val isForeground = isAppInForeground(this)
+            val isAndroid15Plus = Build.VERSION.SDK_INT >= 35
+            val isOverlayVisible = isOverlayVisible()
+            
+            // Check if we can bind camera
+            val canBind = when {
+                camera != null -> {
+                    Log.d(TAG, "Camera already bound, skipping rebind")
+                    false
+                }
+                cameraProvider == null -> {
+                    Log.d(TAG, "Camera provider not ready, will retry")
+                    LogcatManager.addLog("Service: Camera provider not ready, scheduling retry", "Service")
+                    // Retry in 1 second
+                    cameraRebindHandler.postDelayed(this, 1000)
+                    false
+                }
+                imageAnalysis == null -> {
+                    Log.d(TAG, "Image analyzer not ready, will retry")
+                    LogcatManager.addLog("Service: Image analyzer not ready, scheduling retry", "Service")
+                    cameraRebindHandler.postDelayed(this, 1000)
+                    false
+                }
+                isAndroid15Plus && !isForeground && !isOverlayVisible -> {
+                    Log.d(TAG, "Android 15: Cannot rebind - app in background and overlay not visible")
+                    LogcatManager.addLog("Service: Android 15 restriction - scheduling retry when foreground", "Service")
+                    scheduleRetryWhenForeground()
+                    false
+                }
+                else -> true
+            }
+            
+            if (canBind) {
+                Log.d(TAG, "Rebinding camera in service after fragment release (foreground=$isForeground, overlay=$isOverlayVisible)")
                 LogcatManager.addLog("Service: Rebinding camera for background processing", "Service")
+                
+                // Unbind all first to ensure clean state
                 try {
                     cameraProvider?.unbindAll()
-                } catch (_: Exception) {}
-                bindCameraInService()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error during unbindAll in rebind: ${e.message}")
+                }
+                
+                // Small delay to ensure fragment's unbind completes
+                cameraRebindHandler.postDelayed({
+                    bindCameraInService()
+                }, 300) // Increased delay for more reliable handoff
             } else {
-                Log.d(TAG, "Cannot rebind camera - camera: ${camera != null}, provider: ${cameraProvider != null}, analyzer: ${imageAnalysis != null}")
-                LogcatManager.addLog("Service: Cannot rebind camera (camera=${camera != null}, provider=${cameraProvider != null})", "Service")
+                val cameraStatus = camera != null
+                val providerStatus = cameraProvider != null
+                val analyzerStatus = imageAnalysis != null
+                Log.d(TAG, "Cannot rebind camera now - camera: $cameraStatus, provider: $providerStatus, analyzer: $analyzerStatus, foreground: $isForeground, overlay: $isOverlayVisible")
             }
         }
+        
+        cameraRebindHandler.post(rebindRunnable!!)
+    }
+    
+    /**
+     * Schedule camera rebind retry when app returns to foreground or overlay becomes visible
+     * This handles Android 11+ and Android 15 restrictions gracefully
+     */
+    private fun scheduleRetryWhenForeground() {
+        cameraRebindHandler.removeCallbacks(rebindRunnable)
+        
+        val retryRunnable = object : Runnable {
+            override fun run() {
+                if (camera == null && cameraProvider != null && imageAnalysis != null) {
+                    val isForeground = isAppInForeground(this@CameraForegroundService)
+                    val isAndroid15Plus = Build.VERSION.SDK_INT >= 35
+                    val isOverlayVisible = Companion.isOverlayVisible()
+                    
+                    // Android 15: Need foreground OR overlay visible
+                    // Android 11-14: Need foreground
+                    val canBind = if (isAndroid15Plus) {
+                        isForeground || isOverlayVisible
+                    } else {
+                        isForeground
+                    }
+                    
+                    if (canBind) {
+                        Log.d(TAG, "Conditions met for camera bind - retrying (foreground=$isForeground, overlay=$isOverlayVisible)")
+                        LogcatManager.addLog("Service: Conditions met - retrying camera bind", "Service")
+                        try {
+                            cameraProvider?.unbindAll()
+                        } catch (_: Exception) {}
+                        bindCameraInService()
+                    } else {
+                        // Still restricted - check again in 2 seconds
+                        cameraRebindHandler.postDelayed(this, 2000)
+                    }
+                } else {
+                    // Camera already bound or components not ready - stop retrying
+                    Log.d(TAG, "Stopping retry - camera: ${camera != null}, provider: ${cameraProvider != null}, analyzer: ${imageAnalysis != null}")
+                }
+            }
+        }
+        
+        // Check every 2 seconds if conditions are met
+        cameraRebindHandler.postDelayed(retryRunnable, 2000)
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -751,25 +888,45 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     override fun onDestroy() {
         MouseControlService.unregisterOnServiceConnected(mouseServiceReconnectListener)
         
+        // Cancel any pending rebind operations
+        cameraRebindHandler.removeCallbacks(rebindRunnable)
+        rebindRunnable = null
+        
         // Release camera
-        cameraProvider?.unbindAll()
+        try {
+            cameraProvider?.unbindAll()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error unbinding camera on destroy: ${e.message}")
+        }
         camera = null
         imageAnalysis = null
         
         // Cleanup MediaPipe
-        faceLandmarkerHelper?.clearFaceLandmarker()
+        try {
+            faceLandmarkerHelper?.clearFaceLandmarker()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error clearing FaceLandmarker: ${e.message}")
+        }
         faceLandmarkerHelper = null
         
         // Release wake lock
         wakeLock?.let {
             if (it.isHeld) {
-                it.release()
+                try {
+                    it.release()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error releasing wake lock: ${e.message}")
+                }
             }
         }
         wakeLock = null
         
         // Shutdown executor
-        backgroundExecutor.shutdown()
+        try {
+            backgroundExecutor.shutdown()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error shutting down executor: ${e.message}")
+        }
         
         LogcatManager.addLog("Background service stopped", "Service")
         
