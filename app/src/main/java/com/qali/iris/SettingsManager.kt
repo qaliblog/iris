@@ -102,6 +102,11 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_LIVE_PREVIEW, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_LIVE_PREVIEW, value).apply()
     
+    // Screen off tracking - enables PARTIAL_WAKE_LOCK to keep CPU awake when screen is off
+    var screenOffTracking: Boolean
+        get() = prefs.getBoolean(KEY_SCREEN_OFF_TRACKING, true)
+        set(value) = prefs.edit().putBoolean(KEY_SCREEN_OFF_TRACKING, value).apply()
+    
     companion object {
         private const val PREFS_NAME = "iris_settings"
         
@@ -123,5 +128,6 @@ class SettingsManager(context: Context) {
         private const val KEY_CURSOR_COLOR = "cursor_color"
         private const val KEY_CLICK_COLOR = "click_color"
         private const val KEY_SHOW_LIVE_PREVIEW = "show_live_preview"
+        private const val KEY_SCREEN_OFF_TRACKING = "screen_off_tracking"
     }
 }

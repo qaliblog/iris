@@ -144,6 +144,7 @@ class SettingsFragment : Fragment() {
         setupEyePositionEffects()
         setupDistanceMultipliers()
         setupWakeLockToggle()
+        setupScreenOffTrackingToggle()
         setupLivePreviewToggle()
         setupBlinkDetection()
         setupCursorTheming()
@@ -650,6 +651,18 @@ class SettingsFragment : Fragment() {
                 com.qali.iris.EyeTrackingAccessibilityService.toggleWakeLock()
                 LogcatManager.addLog("Wake lock disabled - MediaPipe may pause when device sleeps", "Settings")
             }
+        }
+    }
+
+    private fun setupScreenOffTrackingToggle() {
+        val screenOffSwitch = binding.root.findViewById<android.widget.Switch>(R.id.screen_off_tracking_toggle)
+        screenOffSwitch?.isChecked = settingsManager.screenOffTracking
+
+        screenOffSwitch?.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager.screenOffTracking = isChecked
+            // Update wake lock based on new setting
+            com.qali.iris.EyeTrackingAccessibilityService.updateWakeLockFromSettings()
+            LogcatManager.addLog("Screen off tracking: ${if (isChecked) "enabled" else "disabled"}", "Settings")
         }
     }
 
