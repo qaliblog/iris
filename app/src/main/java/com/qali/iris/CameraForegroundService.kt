@@ -132,26 +132,77 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         super.onCreate()
         instance = this
         
+        // CRITICAL: Start foreground service FIRST, before any other initialization
+        // This must happen in onCreate() to avoid permission errors
+        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        createNotificationChannel()
+        
+        // Start foreground service immediately with notification
+        try {
+            val notification = createNotification()
+            if (notification == null) {
+                Log.e(TAG, "Notification is null - cannot start foreground service")
+                LogcatManager.addLog("ERROR: Notification is null", "Service")
+            } else {
+                // Android 14+ (API 34+) requires service type in startForeground()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    try {
+                        val method = Service::class.java.getMethod(
+                            "startForeground",
+                            Int::class.javaPrimitiveType,
+                            Notification::class.java,
+                            Int::class.javaPrimitiveType
+                        )
+                        method.invoke(
+                            this,
+                            NOTIFICATION_ID,
+                            notification,
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                        )
+                        Log.d(TAG, "Foreground service started with service type in onCreate() (Android ${Build.VERSION.SDK_INT})")
+                        LogcatManager.addLog("Foreground service started successfully in onCreate()", "Service")
+                    } catch (e: NoSuchMethodException) {
+                        // Fallback to regular startForeground
+                        startForeground(NOTIFICATION_ID, notification)
+                        Log.d(TAG, "Using regular startForeground in onCreate()")
+                        LogcatManager.addLog("Foreground service started (fallback) in onCreate()", "Service")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to start foreground with service type in onCreate(): ${e.message}", e)
+                        startForeground(NOTIFICATION_ID, notification)
+                        LogcatManager.addLog("Foreground service started (fallback after error) in onCreate()", "Service")
+                    }
+                } else {
+                    // Android 7-13: regular foreground service
+                    startForeground(NOTIFICATION_ID, notification)
+                    Log.d(TAG, "Foreground service started in onCreate() (Android ${Build.VERSION.SDK_INT})")
+                    LogcatManager.addLog("Foreground service started successfully in onCreate()", "Service")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "CRITICAL: Failed to start foreground service in onCreate(): ${e.message}", e)
+            Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
+            LogcatManager.addLog("CRITICAL: Failed to start foreground service in onCreate(): ${e.message}", "Service")
+            // Try fallback notification
+            try {
+                val simpleNotification = NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("iris Background Service")
+                    .setContentText("Eye tracking active")
+                    .setSmallIcon(android.R.drawable.ic_menu_camera)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .build()
+                startForeground(NOTIFICATION_ID, simpleNotification)
+                Log.w(TAG, "Foreground service started with fallback notification in onCreate()")
+                LogcatManager.addLog("Foreground service started with fallback notification in onCreate()", "Service")
+            } catch (e2: Exception) {
+                Log.e(TAG, "All foreground start attempts failed in onCreate(): ${e2.message}", e2)
+                LogcatManager.addLog("FATAL: Cannot start foreground service in onCreate()", "Service")
+            }
+        }
+        
         // Get display metrics
         val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         displayMetrics = DisplayMetrics().apply {
             windowManager.defaultDisplay.getMetrics(this)
-        }
-        
-        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        // Create notification channel BEFORE creating notification
-        // This is critical for startForeground() to work
-        createNotificationChannel()
-        
-        // Verify channel was created
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = notificationManager?.getNotificationChannel(CHANNEL_ID)
-            if (channel == null) {
-                Log.e(TAG, "Notification channel was not created! This will cause startForeground() to fail.")
-                LogcatManager.addLog("ERROR: Notification channel missing - foreground service will fail", "Service")
-            } else {
-                Log.d(TAG, "Notification channel verified: ${channel.id}")
-            }
         }
         
         // Acquire wake lock
@@ -653,7 +704,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             }
         }
         
-        return START_STICKY // Restart if killed
+        return START_STICKY // Restart if killed - ensures service restarts automatically
     }
     
     override fun onBind(intent: Intent?): IBinder? = null

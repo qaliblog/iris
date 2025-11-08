@@ -944,10 +944,10 @@ class SettingsFragment : Fragment() {
     private fun setupPermissions() {
         binding.openAccessibilitySettings.setOnClickListener {
             try {
-                // Show helpful toast message
+                // Show helpful toast message with all requirements
                 Toast.makeText(
                     requireContext(),
-                    "Enable Iris for background control",
+                    "Enable 'Display over other apps' and 'Iris Accessibility' for background tracking",
                     Toast.LENGTH_LONG
                 ).show()
                 

@@ -1,10 +1,13 @@
 package com.qali.iris
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import androidx.core.content.ContextCompat
 
 /**
  * AccessibilityService for true background eye-tracking on Android 15+
@@ -46,14 +49,41 @@ class EyeTrackingAccessibilityService : AccessibilityService() {
         Log.d(TAG, "EyeTrackingAccessibilityService connected")
         LogcatManager.addLog("Accessibility service connected - Background tracking enabled", "Service")
         
+        // Check if FOREGROUND_SERVICE_CAMERA permission is granted before starting service
+        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.FOREGROUND_SERVICE_CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            // Android 7-9: Permission is granted at install time
+            true
+        }
+        
+        if (!hasPermission) {
+            Log.e(TAG, "FOREGROUND_SERVICE_CAMERA permission not granted - cannot start camera service")
+            LogcatManager.addLog("ERROR: FOREGROUND_SERVICE_CAMERA permission missing", "Service")
+            return
+        }
+        
         // Start CameraForegroundService when accessibility service is enabled
         // This ensures camera continues working even when screen is off
+        // Use startForegroundService() on Android 8+ for proper foreground service handling
         try {
-            CameraForegroundService.start(this)
-            Log.d(TAG, "CameraForegroundService started from accessibility service")
-            LogcatManager.addLog("Camera service started from accessibility service", "Service")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(this, CameraForegroundService::class.java)
+                startForegroundService(intent)
+                Log.d(TAG, "CameraForegroundService started via startForegroundService() from accessibility")
+                LogcatManager.addLog("Camera service started from accessibility service (Android 8+)", "Service")
+            } else {
+                // Android 7: Use regular startService
+                CameraForegroundService.start(this)
+                Log.d(TAG, "CameraForegroundService started from accessibility service (Android 7)")
+                LogcatManager.addLog("Camera service started from accessibility service", "Service")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start CameraForegroundService: ${e.message}", e)
+            Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
             LogcatManager.addLog("Failed to start camera service: ${e.message}", "Service")
         }
     }
