@@ -548,7 +548,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 if (camera == null && cameraProvider != null && imageAnalysis != null) {
                     val isForeground = isAppInForeground(this@CameraForegroundService)
                     val isAndroid15Plus = Build.VERSION.SDK_INT >= 35
-                    val isOverlayVisible = Companion.isOverlayVisible()
+                    val isOverlayVisible = isOverlayVisible()
                     
                     // Android 15: Need foreground OR overlay visible
                     // Android 11-14: Need foreground
@@ -933,5 +933,8 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         
         super.onDestroy()
         instance = null
+    }
+}
+stance = null
     }
 }
