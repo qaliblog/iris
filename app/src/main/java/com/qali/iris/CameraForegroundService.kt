@@ -476,7 +476,9 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     fun rebindCameraIfNeeded() {
         rebindRunnable?.let { cameraRebindHandler.removeCallbacks(it) }
         
-        val runnable = Runnable {
+        // Use a mutable variable that can be referenced from within the lambda
+        var runnableRef: Runnable? = null
+        runnableRef = Runnable {
             val isForeground = isAppInForeground(this@CameraForegroundService)
             val isAndroid15Plus = Build.VERSION.SDK_INT >= 35
             val isOverlayVisible = Companion.isOverlayVisible()
@@ -491,13 +493,13 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                     Log.d(TAG, "Camera provider not ready, will retry")
                     LogcatManager.addLog("Service: Camera provider not ready, scheduling retry", "Service")
                     // Retry in 1 second
-                    cameraRebindHandler.postDelayed(runnable, 1000)
+                    runnableRef?.let { cameraRebindHandler.postDelayed(it, 1000) }
                     false
                 }
                 imageAnalysis == null -> {
                     Log.d(TAG, "Image analyzer not ready, will retry")
                     LogcatManager.addLog("Service: Image analyzer not ready, scheduling retry", "Service")
-                    cameraRebindHandler.postDelayed(runnable, 1000)
+                    runnableRef?.let { cameraRebindHandler.postDelayed(it, 1000) }
                     false
                 }
                 isAndroid15Plus && !isForeground && !isOverlayVisible -> {
@@ -532,8 +534,8 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             }
         }
         
-        rebindRunnable = runnable
-        cameraRebindHandler.post(runnable)
+        rebindRunnable = runnableRef
+        runnableRef?.let { cameraRebindHandler.post(it) }
     }
     
     /**
@@ -548,7 +550,7 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                 if (camera == null && cameraProvider != null && imageAnalysis != null) {
                     val isForeground = isAppInForeground(this@CameraForegroundService)
                     val isAndroid15Plus = Build.VERSION.SDK_INT >= 35
-                    val isOverlayVisible = isOverlayVisible()
+                    val isOverlayVisible = Companion.isOverlayVisible()
                     
                     // Android 15: Need foreground OR overlay visible
                     // Android 11-14: Need foreground
@@ -933,8 +935,5 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         
         super.onDestroy()
         instance = null
-    }
-}
-stance = null
     }
 }
