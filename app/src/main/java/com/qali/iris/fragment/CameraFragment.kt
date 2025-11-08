@@ -25,7 +25,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.Navigation
-import com.qali.iris.CameraForegroundService
 import com.qali.iris.EyeBlinkDetector
 import com.qali.iris.EyeTracker
 import com.qali.iris.FaceLandmarkerHelper
@@ -150,18 +149,12 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         }
 
         if (camera != null || cameraProvider != null) {
-            LogcatManager.addLog("Releasing camera - service takes over", "Camera")
+            LogcatManager.addLog("Releasing camera - accessibility service takes over", "Camera")
             cameraProvider?.unbindAll()
             camera = null
             imageAnalyzer = null
             preview = null
-            CameraForegroundService.getInstance()?.rebindCameraIfNeeded()
-        }
-
-        if (CameraForegroundService.getInstance() == null) {
-            try { CameraForegroundService.start(requireContext()) } catch (e: Exception) {
-                LogcatManager.addLog("Failed to restart service: ${e.message}", "Camera")
-            }
+            EyeTrackingAccessibilityService.getInstance()?.rebindCameraIfNeeded()
         }
     }
 
@@ -177,7 +170,7 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         
         // Delay rebind to ensure fragment's unbind completes
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            CameraForegroundService.getInstance()?.rebindCameraIfNeeded()
+            EyeTrackingAccessibilityService.getInstance()?.rebindCameraIfNeeded()
         }, 500)
 
         _binding = null
@@ -296,11 +289,8 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             }
         }
 
-        try {
-            CameraForegroundService.start(requireContext())
-        } catch (e: Exception) {
-            LogcatManager.addLog("Service start failed: ${e.message}", "Camera")
-        }
+        // Camera and MediaPipe are now handled by EyeTrackingAccessibilityService
+        // No need to start a separate foreground service
 
         backgroundExecutor = Executors.newSingleThreadExecutor()
 

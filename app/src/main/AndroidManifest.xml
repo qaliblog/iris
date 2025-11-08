@@ -89,14 +89,6 @@
             android:enabled="true"
             android:exported="false">
         </service>
-        
-        <!-- Camera foreground service to keep camera active -->
-        <service
-            android:name=".CameraForegroundService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="camera">
-        </service>
     </application>
 
 </manifest>

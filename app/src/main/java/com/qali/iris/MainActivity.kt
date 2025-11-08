@@ -18,7 +18,6 @@ package com.qali.iris
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import com.qali.iris.CameraForegroundService
 import com.qali.iris.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -38,14 +37,8 @@ class MainActivity : AppCompatActivity() {
         // Keep screen on to prevent activity suspension
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         
-        // Start background service immediately - it will handle all camera and tracking operations
-        // This service will continue running even when the app is closed
-        try {
-            CameraForegroundService.start(this)
-            android.util.Log.d("MainActivity", "Background service started")
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Failed to start background service: ${e.message}", e)
-        }
+        // Camera and MediaPipe are now handled by EyeTrackingAccessibilityService
+        // No need to start a separate foreground service - accessibility service handles everything
         
         activityMainBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(activityMainBinding.root)
@@ -53,23 +46,16 @@ class MainActivity : AppCompatActivity() {
     
     override fun onResume() {
         super.onResume()
-        // Ensure service is running
-        if (CameraForegroundService.getInstance() == null) {
-            try {
-                CameraForegroundService.start(this)
-            } catch (e: Exception) {
-                android.util.Log.e("MainActivity", "Failed to restart service: ${e.message}", e)
-            }
-        }
+        // Camera and MediaPipe are handled by EyeTrackingAccessibilityService
+        // User needs to enable accessibility service in system settings
     }
     
     override fun onDestroy() {
         super.onDestroy()
         
-        // DON'T stop the service - let it continue running in background
-        // The service will persist even when app is closed and handle all operations
-        // User can stop it manually via notification or settings
-        android.util.Log.d("MainActivity", "Activity destroyed, but service continues running")
+        // EyeTrackingAccessibilityService continues running when enabled
+        // User can disable it in system accessibility settings
+        android.util.Log.d("MainActivity", "Activity destroyed, accessibility service continues if enabled")
     }
 
     override fun onBackPressed() {

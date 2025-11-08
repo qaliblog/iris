@@ -161,7 +161,7 @@ class SettingsFragment : Fragment() {
 
         // Update wake lock toggle state in case it changed
         _binding?.let {
-            val isEnabled = com.qali.iris.CameraForegroundService.getWakeLockState()
+            val isEnabled = com.qali.iris.EyeTrackingAccessibilityService.getWakeLockState()
             val switch = it.root.findViewById<android.widget.Switch>(R.id.wake_lock_toggle)
             switch?.isChecked = isEnabled
 
@@ -629,29 +629,25 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupWakeLockToggle() {
-        val isEnabled = com.qali.iris.CameraForegroundService.getWakeLockState()
+        val isEnabled = com.qali.iris.EyeTrackingAccessibilityService.getWakeLockState()
         val wakeLockSwitch = binding.root.findViewById<android.widget.Switch>(R.id.wake_lock_toggle)
         wakeLockSwitch?.isChecked = isEnabled
 
         wakeLockSwitch?.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                val service = com.qali.iris.CameraForegroundService.getInstance()
+                val service = com.qali.iris.EyeTrackingAccessibilityService.getInstance()
                 if (service == null) {
-                    try {
-                        com.qali.iris.CameraForegroundService.start(requireContext())
-                        LogcatManager.addLog("Wake lock service started", "Settings")
-                    } catch (e: Exception) {
-                        LogcatManager.addLog("Failed to start wake lock: ${e.message}", "Settings")
-                        wakeLockSwitch?.isChecked = false
-                    }
+                    // Service not running - user needs to enable accessibility service
+                    LogcatManager.addLog("Accessibility service not enabled - enable it in settings", "Settings")
+                    wakeLockSwitch?.isChecked = false
                 } else {
-                    if (!service.isWakeLockEnabled) {
-                        com.qali.iris.CameraForegroundService.toggleWakeLock()
+                    if (!isEnabled) {
+                        com.qali.iris.EyeTrackingAccessibilityService.toggleWakeLock()
                     }
                     LogcatManager.addLog("Wake lock enabled - MediaPipe will continue processing", "Settings")
                 }
             } else {
-                com.qali.iris.CameraForegroundService.toggleWakeLock()
+                com.qali.iris.EyeTrackingAccessibilityService.toggleWakeLock()
                 LogcatManager.addLog("Wake lock disabled - MediaPipe may pause when device sleeps", "Settings")
             }
         }
