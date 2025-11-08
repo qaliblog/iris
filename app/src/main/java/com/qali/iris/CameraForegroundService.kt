@@ -18,10 +18,8 @@ import androidx.camera.core.*
 import androidx.camera.core.CameraSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.core.app.NotificationCompat
-import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.qali.iris.fragment.CameraFragment
@@ -97,12 +95,8 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
     
     // Custom lifecycle owner for service (required for camera binding in foreground service)
-    private val serviceLifecycleOwner: LifecycleOwner = object : LifecycleOwner {
-        private val lifecycleRegistry = LifecycleRegistry(this)
-        override val lifecycle: Lifecycle = lifecycleRegistry
-    }.also {
-        it.lifecycle.currentState = Lifecycle.State.STARTED
-    }
+    // Use ProcessLifecycleOwner as it's already available and works for foreground services
+    private val serviceLifecycleOwner: LifecycleOwner = ProcessLifecycleOwner.get()
     
     // Retry handler for camera binding
     private val cameraRebindHandler = android.os.Handler(android.os.Looper.getMainLooper())
