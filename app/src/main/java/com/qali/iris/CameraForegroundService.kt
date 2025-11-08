@@ -97,11 +97,11 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
     
     // Custom lifecycle owner for service (required for camera binding in foreground service)
-    private val serviceLifecycleOwner = object : LifecycleOwner {
+    private val serviceLifecycleOwner: LifecycleOwner = object : LifecycleOwner {
         private val lifecycleRegistry = LifecycleRegistry(this)
         override val lifecycle: Lifecycle = lifecycleRegistry
-    }.apply {
-        lifecycle.currentState = androidx.lifecycle.Lifecycle.State.STARTED
+    }.also {
+        it.lifecycle.currentState = Lifecycle.State.STARTED
     }
     
     // Retry handler for camera binding
