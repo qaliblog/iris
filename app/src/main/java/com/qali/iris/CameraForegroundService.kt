@@ -1,5 +1,6 @@
 package com.qali.iris
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,8 +17,11 @@ import android.view.WindowManager
 import androidx.camera.core.*
 import androidx.camera.core.CameraSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.qali.iris.fragment.CameraFragment
@@ -59,6 +63,26 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         fun toggleWakeLock() {
             instance?.toggleWakeLock()
         }
+        
+        /**
+         * Check if the app is currently in the foreground
+         * Required for Android 11+ camera access restrictions
+         */
+        fun isAppInForeground(context: Context): Boolean {
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                ?: return false
+            
+            val appProcesses = activityManager.runningAppProcesses ?: return false
+            val packageName = context.packageName
+            
+            for (appProcess in appProcesses) {
+                if (appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND &&
+                    appProcess.processName == packageName) {
+                    return true
+                }
+            }
+            return false
+        }
     }
     
     private var wakeLock: PowerManager.WakeLock? = null
@@ -71,6 +95,18 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     private var camera: Camera? = null
     private var imageAnalysis: ImageAnalysis? = null
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
+    
+    // Custom lifecycle owner for service (required for camera binding in foreground service)
+    private val serviceLifecycleOwner = object : LifecycleOwner {
+        private val lifecycleRegistry = LifecycleRegistry(this)
+        override fun getLifecycle() = lifecycleRegistry
+    }.apply {
+        lifecycle.currentState = androidx.lifecycle.Lifecycle.State.STARTED
+    }
+    
+    // Retry handler for camera binding
+    private val cameraRebindHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var rebindRunnable: Runnable? = null
     
     // Eye tracking components
     private var eyeTracker: EyeTracker? = null
@@ -186,14 +222,40 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             }
         }
         
-        // Start as foreground service
+        // Start as foreground service with proper service type for Android 10+
         try {
             val notification = createNotification()
-            startForeground(NOTIFICATION_ID, notification)
-            Log.d(TAG, "Foreground service started with notification")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Android 14+ requires service type to be specified in startForeground
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android 10+ supports foreground service types
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                )
+            } else {
+                // Android 7-9: regular foreground service
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            Log.d(TAG, "Foreground service started with notification (Android ${Build.VERSION.SDK_INT})")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start foreground service: ${e.message}", e)
-            stopSelf()
+            LogcatManager.addLog("Failed to start foreground service: ${e.message}", "Service")
+            // Don't stop self - try to continue without foreground (may work on older Android)
+            try {
+                startForeground(NOTIFICATION_ID, createNotification())
+            } catch (e2: Exception) {
+                Log.e(TAG, "Fallback foreground start also failed: ${e2.message}", e2)
+                stopSelf()
+            }
         }
     }
     
@@ -269,47 +331,93 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     /**
      * Bind camera in service for background processing
      * This ensures camera processing continues even when fragment is paused/closed
+     * Handles Android 11+ camera restrictions properly
      */
     private fun bindCameraInService() {
         cameraProvider?.let { provider ->
             try {
+                // Check Android 11+ camera restrictions
+                val isForeground = isAppInForeground(this)
+                val isAndroid11Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                
+                if (isAndroid11Plus && !isForeground) {
+                    // Android 11+: Camera access in background is restricted
+                    // We can still try, but it may fail - that's expected behavior
+                    Log.d(TAG, "Attempting camera bind in background (Android 11+) - may be restricted")
+                    LogcatManager.addLog("Service: Attempting camera bind in background (Android 11+ restriction)", "Service")
+                }
+                
                 // Ensure previous bindings are released so service can take over
                 try {
                     provider.unbindAll()
-                } catch (_: Exception) {
-                    // Ignore
-                }
-                // Use front camera
-                val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-                
-                // Don't unbind all immediately - check if fragment might be using it
-                // Only unbind if we're sure fragment released it
-                // Fragment will unbind when paused/destroyed, then we take over
-                
-                // Bind camera to ProcessLifecycleOwner (only ImageAnalysis for processing)
-                // ProcessLifecycleOwner keeps it running even when app is in background
-                // Note: This may conflict with fragment binding, but fragment releases on pause
-                camera = provider.bindToLifecycle(
-                    ProcessLifecycleOwner.get(),
-                    cameraSelector,
-                    imageAnalysis
-                )
-                
-                LogcatManager.addLog("Service: Camera bound for background processing - Camera instance: ${camera != null}", "Service")
-                Log.d(TAG, "Camera bound successfully in service for background - Camera: ${camera != null}")
-                
-                // Verify we actually have a camera instance
-                if (camera == null) {
-                    Log.w(TAG, "Warning: Camera binding returned null - camera may be in use by fragment")
-                    LogcatManager.addLog("Service: Warning - Camera binding returned null", "Service")
+                    // Small delay to ensure unbind completes
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        tryBindCamera(provider)
+                    }, 100)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error during unbindAll: ${e.message}")
+                    // Try binding anyway
+                    tryBindCamera(provider)
                 }
             } catch (e: Exception) {
-                // Camera might be bound by fragment - that's okay, it will release on pause
-                Log.d(TAG, "Camera binding conflict (fragment may have it): ${e.message}")
-                LogcatManager.addLog("Service: Camera binding deferred (fragment may be active)", "Service")
+                Log.e(TAG, "Error in bindCameraInService: ${e.message}", e)
+                LogcatManager.addLog("Service: Camera binding error: ${e.message}", "Service")
             }
         } ?: run {
             LogcatManager.addLog("Service: Camera provider not ready yet, will bind later", "Service")
+        }
+    }
+    
+    /**
+     * Attempt to bind camera with proper lifecycle owner
+     * Uses service lifecycle owner for foreground service binding
+     */
+    private fun tryBindCamera(provider: ProcessCameraProvider) {
+        try {
+            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+            
+            // Use service lifecycle owner instead of ProcessLifecycleOwner
+            // This is more reliable for foreground services
+            camera = provider.bindToLifecycle(
+                serviceLifecycleOwner,
+                cameraSelector,
+                imageAnalysis
+            )
+            
+            if (camera != null) {
+                LogcatManager.addLog("Service: Camera bound successfully - Camera instance: ${camera != null}", "Service")
+                Log.d(TAG, "Camera bound successfully in service - Camera: ${camera != null}")
+            } else {
+                Log.w(TAG, "Warning: Camera binding returned null")
+                LogcatManager.addLog("Service: Warning - Camera binding returned null", "Service")
+                
+                // Try with ProcessLifecycleOwner as fallback
+                try {
+                    camera = provider.bindToLifecycle(
+                        ProcessLifecycleOwner.get(),
+                        cameraSelector,
+                        imageAnalysis
+                    )
+                    if (camera != null) {
+                        Log.d(TAG, "Camera bound successfully using ProcessLifecycleOwner fallback")
+                        LogcatManager.addLog("Service: Camera bound using ProcessLifecycleOwner fallback", "Service")
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "ProcessLifecycleOwner fallback also failed: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            // Camera might be bound by fragment or restricted on Android 11+
+            val isAndroid11Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+            val isForeground = isAppInForeground(this)
+            
+            if (isAndroid11Plus && !isForeground) {
+                Log.d(TAG, "Camera binding failed - Android 11+ background restriction (expected): ${e.message}")
+                LogcatManager.addLog("Service: Camera binding failed - Android 11+ background restriction", "Service")
+            } else {
+                Log.d(TAG, "Camera binding conflict or error: ${e.message}")
+                LogcatManager.addLog("Service: Camera binding deferred: ${e.message}", "Service")
+            }
         }
     }
     
@@ -338,13 +446,43 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             toggleWakeLock()
         }
         
-        // Ensure we're still in foreground
+        // Ensure we're still in foreground with proper service type
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
-                startForeground(NOTIFICATION_ID, createNotification())
+                val notification = createNotification()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    // Android 14+ requires service type
+                    ServiceCompat.startForeground(
+                        this,
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    )
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    // Android 10+ supports service types
+                    ServiceCompat.startForeground(
+                        this,
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start foreground in onStartCommand: ${e.message}", e)
+                // Try fallback
+                try {
+                    startForeground(NOTIFICATION_ID, createNotification())
+                } catch (e2: Exception) {
+                    Log.e(TAG, "Fallback foreground start also failed: ${e2.message}", e2)
+                }
             }
+        }
+        
+        // Try to rebind camera if needed (may have been released)
+        if (camera == null && cameraProvider != null && imageAnalysis != null) {
+            rebindCameraIfNeeded()
         }
         
         // Renew wake lock
@@ -569,9 +707,32 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
         }
         
         try {
-            startForeground(NOTIFICATION_ID, createNotification())
+            val notification = createNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update notification: ${e.message}", e)
+            // Try fallback
+            try {
+                startForeground(NOTIFICATION_ID, createNotification())
+            } catch (e2: Exception) {
+                Log.e(TAG, "Fallback notification update also failed: ${e2.message}", e2)
+            }
         }
     }
     
