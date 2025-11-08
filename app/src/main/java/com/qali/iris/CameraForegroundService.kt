@@ -476,10 +476,10 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
     fun rebindCameraIfNeeded() {
         rebindRunnable?.let { cameraRebindHandler.removeCallbacks(it) }
         
-        rebindRunnable = Runnable {
+        val runnable = Runnable {
             val isForeground = isAppInForeground(this@CameraForegroundService)
             val isAndroid15Plus = Build.VERSION.SDK_INT >= 35
-            val isOverlayVisible = isOverlayVisible()
+            val isOverlayVisible = Companion.isOverlayVisible()
             
             // Check if we can bind camera
             val canBind = when {
@@ -491,13 +491,13 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
                     Log.d(TAG, "Camera provider not ready, will retry")
                     LogcatManager.addLog("Service: Camera provider not ready, scheduling retry", "Service")
                     // Retry in 1 second
-                    cameraRebindHandler.postDelayed(this@Runnable, 1000)
+                    cameraRebindHandler.postDelayed(runnable, 1000)
                     false
                 }
                 imageAnalysis == null -> {
                     Log.d(TAG, "Image analyzer not ready, will retry")
                     LogcatManager.addLog("Service: Image analyzer not ready, scheduling retry", "Service")
-                    cameraRebindHandler.postDelayed(this@Runnable, 1000)
+                    cameraRebindHandler.postDelayed(runnable, 1000)
                     false
                 }
                 isAndroid15Plus && !isForeground && !isOverlayVisible -> {
@@ -532,7 +532,8 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
             }
         }
         
-        cameraRebindHandler.post(rebindRunnable!!)
+        rebindRunnable = runnable
+        cameraRebindHandler.post(runnable)
     }
     
     /**
@@ -540,14 +541,14 @@ class CameraForegroundService : Service(), FaceLandmarkerHelper.LandmarkerListen
      * This handles Android 11+ and Android 15 restrictions gracefully
      */
     private fun scheduleRetryWhenForeground() {
-        cameraRebindHandler.removeCallbacks(rebindRunnable)
+        rebindRunnable?.let { cameraRebindHandler.removeCallbacks(it) }
         
         val retryRunnable = object : Runnable {
             override fun run() {
                 if (camera == null && cameraProvider != null && imageAnalysis != null) {
                     val isForeground = isAppInForeground(this@CameraForegroundService)
                     val isAndroid15Plus = Build.VERSION.SDK_INT >= 35
-                    val isOverlayVisible = isOverlayVisible()
+                    val isOverlayVisible = Companion.isOverlayVisible()
                     
                     // Android 15: Need foreground OR overlay visible
                     // Android 11-14: Need foreground
