@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Accessibility service configuration for Eye Tracking
+    This service enables true background eye-tracking on Android 15+
+    by bypassing overlay and camera restrictions
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/eye_tracking_accessibility_description"
+    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
+    android:canRequestTouchExplorationMode="false"
+    android:canRequestFilterKeyEvents="false"
+    android:notificationTimeout="100"
+    android:settingsActivity="com.qali.iris.MainActivity" />

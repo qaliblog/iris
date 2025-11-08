@@ -1,5 +1,6 @@
 package com.qali.iris
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -30,6 +31,26 @@ class PointerOverlayService : Service() {
         private var instance: PointerOverlayService? = null
         
         fun getInstance(): PointerOverlayService? = instance
+        
+        /**
+         * Check if the app is currently in the foreground
+         * Required for Android 15 overlay update restrictions
+         */
+        fun isAppInForeground(context: Context): Boolean {
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                ?: return false
+            
+            val appProcesses = activityManager.runningAppProcesses ?: return false
+            val packageName = context.packageName
+            
+            for (appProcess in appProcesses) {
+                if (appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND &&
+                    appProcess.processName == packageName) {
+                    return true
+                }
+            }
+            return false
+        }
         
         fun updatePointerPosition(x: Float, y: Float) {
             instance?.let { service ->
@@ -212,8 +233,24 @@ class PointerOverlayService : Service() {
                 val screenX = x.toInt() - 30 // Center the pointer (60/2)
                 val screenY = y.toInt() - 30
                 
-                // Always update position (removed optimization check to ensure timely updates)
-                // This ensures cursor updates are transmitted correctly and on time
+                // Android 15+ restriction: Only update overlay if:
+                // 1. EyeTrackingAccessibilityService is enabled (bypasses restriction), OR
+                // 2. App is in foreground
+                val isAccessibilityEnabled = EyeTrackingAccessibilityService.isEnabled()
+                val isForeground = isAppInForeground(this)
+                val canUpdateOverlay = isAccessibilityEnabled || isForeground
+                
+                if (!canUpdateOverlay) {
+                    // Android 15 restriction: Cannot update overlay in background without accessibility
+                    // Log periodically to indicate restriction (every 3 seconds)
+                    val now = System.currentTimeMillis()
+                    if (now % 3000 < 100) {
+                        Log.d(TAG, "Overlay update blocked - Android 15 restriction (accessibility=${isAccessibilityEnabled}, foreground=${isForeground})")
+                    }
+                    return
+                }
+                
+                // Update position
                 it.x = screenX
                 it.y = screenY
                 
@@ -233,7 +270,7 @@ class PointerOverlayService : Service() {
                             // Log periodically to confirm updates (every 2 seconds)
                             val now = System.currentTimeMillis()
                             if (now % 2000 < 50) {
-                                Log.d(TAG, "Pointer updated in background to ($screenX, $screenY)")
+                                Log.d(TAG, "Pointer updated to ($screenX, $screenY) - accessibility=${isAccessibilityEnabled}, foreground=${isForeground}")
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error updating pointer position on main thread: ${e.message}", e)

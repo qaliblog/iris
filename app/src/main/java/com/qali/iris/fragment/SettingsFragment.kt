@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
@@ -943,6 +944,32 @@ class SettingsFragment : Fragment() {
     private fun setupPermissions() {
         binding.openAccessibilitySettings.setOnClickListener {
             try {
+                // Show helpful toast message
+                Toast.makeText(
+                    requireContext(),
+                    "Enable Iris for background control",
+                    Toast.LENGTH_LONG
+                ).show()
+                
+                // Try to open accessibility settings directly to Iris service (Android 11+)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        val action = Settings::class.java.getField("ACTION_ACCESSIBILITY_DETAILS_SETTINGS").get(null) as String
+                        val intent = Intent(action).apply {
+                            data = android.net.Uri.parse("package:${requireContext().packageName}/${com.qali.iris.EyeTrackingAccessibilityService::class.java.name}")
+                        }
+                        if (intent.resolveActivity(requireContext().packageManager) != null) {
+                            startActivity(intent)
+                            LogcatManager.addLog("Opening Iris accessibility settings", "Settings")
+                            return@setOnClickListener
+                        }
+                    } catch (e: Exception) {
+                        // Fallback to general accessibility settings
+                        android.util.Log.d("SettingsFragment", "Could not open specific accessibility settings: ${e.message}")
+                    }
+                }
+                
+                // Fallback: Open general accessibility settings
                 val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                 startActivity(intent)
                 LogcatManager.addLog("Opening accessibility settings", "Settings")

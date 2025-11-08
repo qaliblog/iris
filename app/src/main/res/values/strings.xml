@@ -51,5 +51,6 @@
     </string-array>
 
     <string name="accessibility_service_description">Enable mouse control using eye tracking. This service allows iris to control the cursor on your device.</string>
+    <string name="eye_tracking_accessibility_description">Enable background eye-tracking. This allows iris to track your eyes and move the cursor even when the app is minimized or the screen is off. Required for Android 15+ background tracking.</string>
 </resources>
 
