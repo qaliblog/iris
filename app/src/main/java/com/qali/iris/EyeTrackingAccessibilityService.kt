@@ -259,12 +259,9 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                     backgroundExecutor,
                     ImageAnalysis.Analyzer { imageProxy: ImageProxy ->
                         try {
-                            // Log periodically to confirm frames are being processed
-                            val now = System.currentTimeMillis()
-                            if (now % 5000 < 100) { // Log every 5 seconds
-                                LogcatManager.addLog("Service: Processing camera frame - MediaPipe active | Camera bound: ${camera != null}", "Service")
-                                Log.d(TAG, "Processing camera frame in accessibility service - Camera: ${camera != null}")
-                            }
+                            // Log every frame received
+                            Log.d(TAG, "FRAME RECEIVED")
+                            LogcatManager.addLog("Service: FRAME RECEIVED - Processing camera frame", "Service")
                             
                             // Update settings dynamically
                             eyeTracker?.setUseOneEye(settingsManager?.useOneEyeDetection ?: false)
@@ -273,9 +270,22 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                             eyeBlinkDetector?.setClickDelayThreshold(settingsManager?.clickDelayThreshold ?: 200L)
                             
                             // FORCE processing even if preview is hidden - this is critical for background tracking
-                            // Process frame - this will trigger onResults callback which updates cursor
-                            faceLandmarkerHelper?.detectLiveStream(imageProxy, isFrontCamera = true)
-                            Log.d(TAG, "Frame sent to MediaPipe for face detection (preview visibility does not affect processing)")
+                            // Run detectLiveStream() on a separate background thread to avoid blocking
+                            val imageProxyRef = imageProxy
+                            Thread {
+                                try {
+                                    Log.d(TAG, "FRAME RECEIVED: Starting face detection on background thread")
+                                    faceLandmarkerHelper?.detectLiveStream(imageProxyRef, isFrontCamera = true)
+                                    Log.d(TAG, "FRAME RECEIVED: Frame sent to MediaPipe for face detection")
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "FRAME RECEIVED: Error in detectLiveStream: ${e.message}", e)
+                                    try {
+                                        imageProxyRef.close()
+                                    } catch (closeEx: Exception) {
+                                        // Ignore close errors
+                                    }
+                                }
+                            }.start()
                         } catch (e: Exception) {
                             Log.e(TAG, "Error processing frame: ${e.message}", e)
                             LogcatManager.addLog("Service: Frame processing error: ${e.message}", "Service")
@@ -491,15 +501,18 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             
             if (faceLandmarksList.isEmpty()) {
                 // No face detected - hide pointer
-                Log.d(TAG, "onResults: NO FACE DETECTED - hiding pointer")
+                Log.d(TAG, "NO FACE")
+                LogcatManager.addLog("Service: NO FACE - hiding pointer", "Service")
                 PointerOverlayService.getInstance()?.hidePointer()
                 return
             }
             
-            Log.d(TAG, "onResults: FACE DETECTED! Processing landmarks...")
+            Log.d(TAG, "FACE DETECTED!")
+            LogcatManager.addLog("Service: FACE DETECTED! Processing landmarks...", "Service")
             val landmarks = faceLandmarksList.firstOrNull()
             if (landmarks == null) {
-                Log.w(TAG, "onResults: Landmarks list not empty but firstOrNull returned null - hiding pointer")
+                Log.w(TAG, "NO FACE - Landmarks list not empty but firstOrNull returned null")
+                LogcatManager.addLog("Service: NO FACE - Landmarks list not empty but firstOrNull returned null", "Service")
                 PointerOverlayService.getInstance()?.hidePointer()
                 return
             }
