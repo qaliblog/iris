@@ -333,7 +333,9 @@ class FaceLandmarkerHelper(
         result: FaceLandmarkerResult,
         input: MPImage
     ) {
-        if( result.faceLandmarks().size > 0 ) {
+        val faceLandmarks = result.faceLandmarks()
+        if( faceLandmarks.size > 0 ) {
+            Log.d(TAG, "FACE DETECTED! Landmarks count: ${faceLandmarks.size}")
             val finishTimeMs = SystemClock.uptimeMillis()
             val inferenceTime = finishTimeMs - result.timestampMs()
 
@@ -347,6 +349,7 @@ class FaceLandmarkerHelper(
             )
         }
         else {
+            Log.d(TAG, "NO FACE DETECTED - faceLandmarks is empty")
             faceLandmarkerHelperListener?.onEmpty()
         }
     }

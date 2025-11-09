@@ -272,8 +272,10 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                             eyeBlinkDetector?.setHalfBlinkAccelThreshold(settingsManager?.halfBlinkAccelThreshold ?: 0.15f)
                             eyeBlinkDetector?.setClickDelayThreshold(settingsManager?.clickDelayThreshold ?: 200L)
                             
+                            // FORCE processing even if preview is hidden - this is critical for background tracking
                             // Process frame - this will trigger onResults callback which updates cursor
                             faceLandmarkerHelper?.detectLiveStream(imageProxy, isFrontCamera = true)
+                            Log.d(TAG, "Frame sent to MediaPipe for face detection (preview visibility does not affect processing)")
                         } catch (e: Exception) {
                             Log.e(TAG, "Error processing frame: ${e.message}", e)
                             LogcatManager.addLog("Service: Frame processing error: ${e.message}", "Service")
@@ -483,15 +485,21 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
     // FaceLandmarkerHelper.LandmarkerListener implementation
     override fun onResults(resultBundle: FaceLandmarkerHelper.ResultBundle) {
         try {
+            Log.d(TAG, "onResults() called - processing face detection results")
             val faceLandmarksList = resultBundle.result.faceLandmarks()
+            Log.d(TAG, "onResults: faceLandmarksList size = ${faceLandmarksList.size}")
+            
             if (faceLandmarksList.isEmpty()) {
                 // No face detected - hide pointer
+                Log.d(TAG, "onResults: NO FACE DETECTED - hiding pointer")
                 PointerOverlayService.getInstance()?.hidePointer()
                 return
             }
             
+            Log.d(TAG, "onResults: FACE DETECTED! Processing landmarks...")
             val landmarks = faceLandmarksList.firstOrNull()
             if (landmarks == null) {
+                Log.w(TAG, "onResults: Landmarks list not empty but firstOrNull returned null - hiding pointer")
                 PointerOverlayService.getInstance()?.hidePointer()
                 return
             }
@@ -541,14 +549,13 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             }
             
             // Service always updates pointer in background (AccessibilityService exemption allows this)
+            Log.d(TAG, "onResults: Updating pointer position to ($adjustedX, $adjustedY)")
             PointerOverlayService.updatePointerPosition(adjustedX, adjustedY)
             MouseControlService.moveCursor(adjustedX, adjustedY)
             
-            // Log periodically to confirm cursor updates (every 3 seconds)
-            val now = System.currentTimeMillis()
-            if (now % 3000 < 100) {
-                LogcatManager.addLog("Service: Cursor updated to (${adjustedX.toInt()}, ${adjustedY.toInt()}) | Camera: ${camera != null}", "Service")
-            }
+            // Log every update to track cursor movement
+            Log.d(TAG, "onResults: Cursor updated to (${adjustedX.toInt()}, ${adjustedY.toInt()}) | Camera: ${camera != null}")
+            LogcatManager.addLog("Service: Cursor updated to (${adjustedX.toInt()}, ${adjustedY.toInt()}) | Camera: ${camera != null}", "Service")
         } catch (e: Exception) {
             Log.e(TAG, "Error processing results: ${e.message}", e)
         }

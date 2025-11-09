@@ -10,6 +10,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -54,12 +55,16 @@ class PointerOverlayService : Service() {
         
         fun updatePointerPosition(x: Float, y: Float) {
             instance?.let { service ->
+                Log.d(TAG, "updatePointerPosition called: x=$x, y=$y")
                 if (x < 0 || y < 0) {
+                    Log.d(TAG, "updatePointerPosition: Hiding pointer (invalid coordinates)")
                     service.hidePointer()
                 } else {
                     service.pointerView?.visibility = View.VISIBLE
                     service.updatePointer(x, y)
                 }
+            } ?: run {
+                Log.w(TAG, "updatePointerPosition: Service instance is null - cannot update pointer")
             }
         }
         
@@ -169,15 +174,37 @@ class PointerOverlayService : Service() {
         
         pointerLayout?.addView(pointerView)
         
+        // Determine window type based on Android version
+        // Android 8.0+ (API 26+): TYPE_ACCESSIBILITY_OVERLAY is available for accessibility services
+        // This allows overlay updates even when app is in background on Android 15+
+        val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Check if we're running as an accessibility service (which we are via EyeTrackingAccessibilityService)
+            // TYPE_ACCESSIBILITY_OVERLAY (2038) is available from API 26+
+            // For Android 15+, this is preferred for accessibility services
+            if (Build.VERSION.SDK_INT >= 35 && EyeTrackingAccessibilityService.isEnabled()) {
+                // Android 15+ with accessibility service: Use TYPE_ACCESSIBILITY_OVERLAY
+                // This bypasses background overlay update restrictions
+                try {
+                    // TYPE_ACCESSIBILITY_OVERLAY = 2038 (available from API 26+)
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+                } catch (e: Exception) {
+                    Log.w(TAG, "TYPE_ACCESSIBILITY_OVERLAY not available, using TYPE_APPLICATION_OVERLAY: ${e.message}")
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                }
+            } else {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        
+        Log.d(TAG, "Using window type: $windowType (SDK=${Build.VERSION.SDK_INT}, accessibility=${EyeTrackingAccessibilityService.isEnabled()})")
+        
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            },
+            windowType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -220,9 +247,12 @@ class PointerOverlayService : Service() {
     }
     
     fun updatePointer(x: Float, y: Float) {
+        Log.d(TAG, "updatePointer() called: x=$x, y=$y")
+        
         // Only update if valid coordinates (not -1)
         if (x < 0 || y < 0) {
             // Hide pointer if invalid coordinates
+            Log.d(TAG, "updatePointer: Invalid coordinates, hiding pointer")
             hidePointer()
             return
         }
@@ -240,13 +270,23 @@ class PointerOverlayService : Service() {
                 val isForeground = isAppInForeground(this)
                 val canUpdateOverlay = isAccessibilityEnabled || isForeground
                 
+                // Check overlay permission
+                val canDrawOverlays = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Settings.canDrawOverlays(this)
+                } else {
+                    true
+                }
+                
+                Log.d(TAG, "updatePointer: screenX=$screenX, screenY=$screenY, accessibility=$isAccessibilityEnabled, foreground=$isForeground, canDrawOverlays=$canDrawOverlays")
+                
+                if (!canDrawOverlays) {
+                    Log.w(TAG, "updatePointer: Overlay permission not granted - cannot update pointer")
+                    return
+                }
+                
                 if (!canUpdateOverlay) {
                     // Android 15 restriction: Cannot update overlay in background without accessibility
-                    // Log periodically to indicate restriction (every 3 seconds)
-                    val now = System.currentTimeMillis()
-                    if (now % 3000 < 100) {
-                        Log.d(TAG, "Overlay update blocked - Android 15 restriction (accessibility=${isAccessibilityEnabled}, foreground=${isForeground})")
-                    }
+                    Log.w(TAG, "updatePointer: Overlay update blocked - Android 15 restriction (accessibility=$isAccessibilityEnabled, foreground=$isForeground)")
                     return
                 }
                 
@@ -259,7 +299,7 @@ class PointerOverlayService : Service() {
                     // This is critical for background updates
                     if (view.visibility != View.VISIBLE) {
                         view.visibility = View.VISIBLE
-                        Log.d(TAG, "Pointer view made visible for background update")
+                        Log.d(TAG, "updatePointer: Pointer view made visible for background update")
                     }
                     
                     // Always update on main thread immediately
@@ -267,21 +307,19 @@ class PointerOverlayService : Service() {
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         try {
                             windowManager?.updateViewLayout(view, it)
-                            // Log periodically to confirm updates (every 2 seconds)
-                            val now = System.currentTimeMillis()
-                            if (now % 2000 < 50) {
-                                Log.d(TAG, "Pointer updated to ($screenX, $screenY) - accessibility=${isAccessibilityEnabled}, foreground=${isForeground}")
-                            }
+                            Log.d(TAG, "updatePointer: SUCCESS - Pointer updated to ($screenX, $screenY) - accessibility=$isAccessibilityEnabled, foreground=$isForeground")
                         } catch (e: Exception) {
-                            Log.e(TAG, "Error updating pointer position on main thread: ${e.message}", e)
+                            Log.e(TAG, "updatePointer: Error updating pointer position on main thread: ${e.message}", e)
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error updating pointer position: ${e.message}", e)
+                    Log.e(TAG, "updatePointer: Error updating pointer position: ${e.message}", e)
                 }
+            } ?: run {
+                Log.w(TAG, "updatePointer: Layout params are null, cannot update pointer")
             }
         } ?: run {
-            Log.w(TAG, "Pointer layout is null, cannot update pointer")
+            Log.w(TAG, "updatePointer: Pointer layout is null, cannot update pointer")
         }
     }
     

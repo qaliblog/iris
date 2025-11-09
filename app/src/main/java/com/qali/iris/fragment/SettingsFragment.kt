@@ -951,6 +951,19 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupPermissions() {
+        // Check overlay permission status and log it
+        val canDrawOverlays = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(requireContext())
+        } else {
+            true
+        }
+        
+        if (!canDrawOverlays) {
+            LogcatManager.addLog("WARNING: Overlay permission not granted - cursor will not work in background", "Settings")
+        } else {
+            LogcatManager.addLog("Overlay permission granted", "Settings")
+        }
+        
         binding.openAccessibilitySettings.setOnClickListener {
             try {
                 // Show helpful toast message with all requirements
@@ -991,6 +1004,11 @@ class SettingsFragment : Fragment() {
         binding.openOverlaySettings.setOnClickListener {
             try {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    val canDraw = Settings.canDrawOverlays(requireContext())
+                    if (!canDraw) {
+                        LogcatManager.addLog("Overlay permission not granted - opening settings", "Settings")
+                    }
+                    
                     val intent = Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         android.net.Uri.parse("package:${requireContext().packageName}")
