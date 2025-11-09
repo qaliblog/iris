@@ -97,6 +97,11 @@ class SettingsManager(context: Context) {
     var clickColor: Int
         get() = prefs.getInt(KEY_CLICK_COLOR, android.graphics.Color.GREEN)
         set(value) = prefs.edit().putInt(KEY_CLICK_COLOR, value).apply()
+    
+    // Drag color (default purple)
+    var dragColor: Int
+        get() = prefs.getInt(KEY_DRAG_COLOR, android.graphics.Color.parseColor("#9C27B0"))
+        set(value) = prefs.edit().putInt(KEY_DRAG_COLOR, value).apply()
 
     var showLivePreview: Boolean
         get() = prefs.getBoolean(KEY_SHOW_LIVE_PREVIEW, true)

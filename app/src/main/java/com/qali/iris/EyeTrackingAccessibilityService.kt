@@ -321,14 +321,14 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
     private fun bindCameraWithFakeLifecycle() {
         cameraProvider?.let { provider ->
             try {
-                // Ensure fake lifecycle is in STARTED state
-                fakeLifecycleOwner.markState(Lifecycle.State.STARTED)
-                
                 val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+                
+                // Create fake LifecycleOwner with STARTED state
+                val fakeLifecycle = FakeLifecycleOwner()
                 
                 // Use fake LifecycleOwner for camera binding
                 camera = provider.bindToLifecycle(
-                    fakeLifecycleOwner,
+                    fakeLifecycle,
                     cameraSelector,
                     imageAnalysis
                 )

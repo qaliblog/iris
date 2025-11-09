@@ -69,6 +69,17 @@ class PointerView(context: Context) : View(context) {
     }
     
     /**
+     * Set drag color (color shown when dragging)
+     */
+    fun setDragColor(color: Int) {
+        dragColor = color
+        if (isDragging) {
+            updatePaintColors()
+            invalidate()
+        }
+    }
+    
+    /**
      * Indicate that a click was detected
      */
     fun indicateClick() {
