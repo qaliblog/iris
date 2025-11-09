@@ -170,6 +170,7 @@ class PointerOverlayService : Service() {
             val settingsManager = SettingsManager(this@PointerOverlayService)
             setCursorColor(settingsManager.cursorColor)
             setClickColor(settingsManager.clickColor)
+            setDragColor(settingsManager.dragColor)
         }
         
         pointerLayout?.addView(pointerView)

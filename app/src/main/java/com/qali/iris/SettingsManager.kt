@@ -127,6 +127,7 @@ class SettingsManager(context: Context) {
         private const val KEY_CLICK_DELAY_THRESHOLD = "click_delay_threshold"
         private const val KEY_CURSOR_COLOR = "cursor_color"
         private const val KEY_CLICK_COLOR = "click_color"
+        private const val KEY_DRAG_COLOR = "drag_color"
         private const val KEY_SHOW_LIVE_PREVIEW = "show_live_preview"
         private const val KEY_SCREEN_OFF_TRACKING = "screen_off_tracking"
     }

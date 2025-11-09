@@ -785,10 +785,14 @@ class SettingsFragment : Fragment() {
         val cursorColorButton = binding.cursorColorButton
         val clickColorPreview = binding.clickColorPreview
         val clickColorButton = binding.clickColorButton
+        // Drag color preview and button (if they exist in layout)
+        val dragColorPreview = binding.root.findViewById<android.view.View>(R.id.drag_color_preview)
+        val dragColorButton = binding.root.findViewById<android.widget.Button>(R.id.drag_color_button)
 
         fun updateColorPreviews() {
             cursorColorPreview.setBackgroundColor(settingsManager.cursorColor)
             clickColorPreview.setBackgroundColor(settingsManager.clickColor)
+            dragColorPreview?.setBackgroundColor(settingsManager.dragColor)
         }
 
         updateColorPreviews()
@@ -810,15 +814,26 @@ class SettingsFragment : Fragment() {
                 LogcatManager.addLog("Click color updated: #${Integer.toHexString(color)}", "Settings")
             }
         }
+        
+        dragColorButton?.setOnClickListener {
+            showColorPickerDialog("Drag Color", settingsManager.dragColor) { color ->
+                settingsManager.dragColor = color
+                updateColorPreviews()
+                applyCursorColors()
+                LogcatManager.addLog("Drag color updated: #${Integer.toHexString(color)}", "Settings")
+            }
+        }
     }
 
     private fun applyCursorColors() {
         val cursorColor = settingsManager.cursorColor
         val clickColor = settingsManager.clickColor
+        val dragColor = settingsManager.dragColor
 
         PointerOverlayService.getInstance()?.let { service ->
             service.pointerView?.setCursorColor(cursorColor)
             service.pointerView?.setClickColor(clickColor)
+            service.pointerView?.setDragColor(dragColor)
         }
 
         try {

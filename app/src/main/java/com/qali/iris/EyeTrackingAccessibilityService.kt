@@ -12,30 +12,8 @@ import android.view.accessibility.AccessibilityEvent
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import java.util.concurrent.Executors
-
-/**
- * Fake LifecycleOwner for AccessibilityService
- * AccessibilityService is not a LifecycleOwner, so we create a fake one
- */
-class FakeLifecycleOwner : LifecycleOwner {
-    private val lifecycleRegistry = LifecycleRegistry(this)
-    
-    init {
-        lifecycleRegistry.currentState = Lifecycle.State.STARTED
-    }
-    
-    override val lifecycle: Lifecycle
-        get() = lifecycleRegistry
-    
-    fun markState(state: Lifecycle.State) {
-        lifecycleRegistry.currentState = state
-    }
-}
 
 /**
  * AccessibilityService for true background eye-tracking on Android 15+
@@ -122,9 +100,6 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
     private var camera: Camera? = null
     private var imageAnalysis: ImageAnalysis? = null
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
-    
-    // Fake LifecycleOwner for camera binding (AccessibilityService is not a LifecycleOwner)
-    private val fakeLifecycleOwner = FakeLifecycleOwner()
     
     // Retry handler for camera binding
     private val cameraRebindHandler = android.os.Handler(android.os.Looper.getMainLooper())

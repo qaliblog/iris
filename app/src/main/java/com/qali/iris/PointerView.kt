@@ -19,9 +19,10 @@ class PointerView(context: Context) : View(context) {
     private var isDragging = false
     private val mainHandler = Handler(Looper.getMainLooper())
     
-    // Default colors: blue for cursor, green for click
+    // Default colors: blue for cursor, green for click, purple for drag
     private var cursorColor: Int = Color.BLUE
     private var clickColor: Int = Color.GREEN
+    private var dragColor: Int = Color.parseColor("#9C27B0") // Purple
     
     private val pointerPaint = Paint().apply {
         color = Color.BLUE
@@ -115,7 +116,11 @@ class PointerView(context: Context) : View(context) {
     }
 
     private fun updatePaintColors() {
-        val color = if (isClicking) clickColor else cursorColor
+        val color = when {
+            isDragging -> dragColor
+            isClicking -> clickColor
+            else -> cursorColor
+        }
         pointerPaint.color = color
         centerPaint.color = color
         outerPaint.color = color
