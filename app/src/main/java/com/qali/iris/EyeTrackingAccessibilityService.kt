@@ -29,7 +29,8 @@ class FakeLifecycleOwner : LifecycleOwner {
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
     }
     
-    override fun getLifecycle(): Lifecycle = lifecycleRegistry
+    override val lifecycle: Lifecycle
+        get() = lifecycleRegistry
     
     fun markState(state: Lifecycle.State) {
         lifecycleRegistry.currentState = state
