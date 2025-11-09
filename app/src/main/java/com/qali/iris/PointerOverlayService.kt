@@ -307,7 +307,8 @@ class PointerOverlayService : Service() {
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         try {
                             windowManager?.updateViewLayout(view, it)
-                            Log.d(TAG, "updatePointer: SUCCESS - Pointer updated to ($screenX, $screenY) - accessibility=$isAccessibilityEnabled, foreground=$isForeground")
+                            Log.d(TAG, "Overlay UPDATED: Pointer updated to ($screenX, $screenY) - accessibility=$isAccessibilityEnabled, foreground=$isForeground")
+                            LogcatManager.addLog("Overlay UPDATED: Pointer at ($screenX, $screenY)", "Service")
                         } catch (e: Exception) {
                             Log.e(TAG, "updatePointer: Error updating pointer position on main thread: ${e.message}", e)
                         }

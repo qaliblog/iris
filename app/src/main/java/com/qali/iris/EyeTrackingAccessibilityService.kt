@@ -12,9 +12,29 @@ import android.view.accessibility.AccessibilityEvent
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import java.util.concurrent.Executors
+
+/**
+ * Fake LifecycleOwner for AccessibilityService
+ * AccessibilityService is not a LifecycleOwner, so we create a fake one
+ */
+class FakeLifecycleOwner : LifecycleOwner {
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    
+    init {
+        lifecycleRegistry.currentState = Lifecycle.State.STARTED
+    }
+    
+    override fun getLifecycle(): Lifecycle = lifecycleRegistry
+    
+    fun markState(state: Lifecycle.State) {
+        lifecycleRegistry.currentState = state
+    }
+}
 
 /**
  * AccessibilityService for true background eye-tracking on Android 15+
@@ -102,8 +122,8 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
     private var imageAnalysis: ImageAnalysis? = null
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
     
-    // Custom lifecycle owner for service (required for camera binding in service)
-    private val serviceLifecycleOwner = ProcessLifecycleOwner.get()
+    // Fake LifecycleOwner for camera binding (AccessibilityService is not a LifecycleOwner)
+    private val fakeLifecycleOwner = FakeLifecycleOwner()
     
     // Retry handler for camera binding
     private val cameraRebindHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -228,6 +248,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                     currentDelegate = FaceLandmarkerHelper.DELEGATE_GPU,
                     faceLandmarkerHelperListener = this@EyeTrackingAccessibilityService
                 )
+                Log.d(TAG, "MediaPipe initialized")
                 LogcatManager.addLog("FaceLandmarkerHelper initialized in accessibility service", "Service")
                 
                 // Initialize camera after MediaPipe is ready
@@ -298,16 +319,16 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                     }
                 )
                 
-                // Bind camera in service for background processing
-                // AccessibilityService exemption allows camera access in background
-                bindCameraInService()
+                // Bind camera using fake LifecycleOwner
+                // AccessibilityService is not a LifecycleOwner, so we use a fake one
+                bindCameraWithFakeLifecycle()
                 
                 // Also schedule a delayed rebind attempt in case fragment has the camera
                 // This ensures we get the camera when fragment releases it
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                     if (camera == null && cameraProvider != null && imageAnalysis != null) {
                         Log.d(TAG, "Attempting delayed camera rebind in accessibility service")
-                        bindCameraInService()
+                        bindCameraWithFakeLifecycle()
                     }
                 }, 1000)
             } catch (e: Exception) {
@@ -318,103 +339,37 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
     }
     
     /**
-     * Bind camera in service for background processing
-     * AccessibilityService exemption allows camera access in background on Android 15+
+     * Bind camera using fake LifecycleOwner
+     * AccessibilityService is not a LifecycleOwner, so we create a fake one
      */
-    private fun bindCameraInService() {
+    private fun bindCameraWithFakeLifecycle() {
         cameraProvider?.let { provider ->
             try {
-                // Check Android version and restrictions
-                val isForeground = isAppInForeground(this)
-                val isAndroid11Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-                val isAndroid15Plus = Build.VERSION.SDK_INT >= 35 // Android 15 (API 35)
-                val isOverlayVisible = Companion.isOverlayVisible()
+                // Ensure fake lifecycle is in STARTED state
+                fakeLifecycleOwner.markState(Lifecycle.State.STARTED)
                 
-                // Android 15: Camera access in background requires overlay to be visible OR AccessibilityService
-                // Since we're in AccessibilityService, we have exemption
-                if (isAndroid15Plus && !isForeground && !isOverlayVisible) {
-                    Log.d(TAG, "Android 15: AccessibilityService exemption allows camera access")
-                    LogcatManager.addLog("Service: Android 15 - Using AccessibilityService exemption", "Service")
-                }
+                val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                 
-                // Android 11-14: Camera access in background is restricted, but AccessibilityService may help
-                if (isAndroid11Plus && !isAndroid15Plus && !isForeground) {
-                    Log.d(TAG, "Attempting camera bind in background (Android 11-14) - AccessibilityService may help")
-                    LogcatManager.addLog("Service: Attempting camera bind in background (Android 11-14)", "Service")
-                }
+                // Use fake LifecycleOwner for camera binding
+                camera = provider.bindToLifecycle(
+                    fakeLifecycleOwner,
+                    cameraSelector,
+                    imageAnalysis
+                )
                 
-                // Ensure previous bindings are released so service can take over
-                try {
-                    provider.unbindAll()
-                    // Small delay to ensure unbind completes (critical for proper handoff)
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        tryBindCamera(provider)
-                    }, 200) // Increased delay for more reliable handoff
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error during unbindAll: ${e.message}")
-                    // Try binding anyway after a short delay
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        tryBindCamera(provider)
-                    }, 200)
+                if (camera != null) {
+                    Log.d(TAG, "Camera bound successfully using fake LifecycleOwner")
+                    LogcatManager.addLog("Service: Camera bound successfully - Camera instance: ${camera != null}", "Service")
+                } else {
+                    Log.w(TAG, "Warning: Camera binding returned null")
+                    LogcatManager.addLog("Service: Warning - Camera binding returned null", "Service")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error in bindCameraInService: ${e.message}", e)
+                Log.e(TAG, "Camera binding failed with fake LifecycleOwner: ${e.message}", e)
                 LogcatManager.addLog("Service: Camera binding error: ${e.message}", "Service")
             }
         } ?: run {
             LogcatManager.addLog("Service: Camera provider not ready yet, will bind later", "Service")
-        }
-    }
-    
-    /**
-     * Attempt to bind camera with proper lifecycle owner
-     * Uses service lifecycle owner for service binding
-     */
-    private fun tryBindCamera(provider: ProcessCameraProvider) {
-        try {
-            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-            
-            // Use service lifecycle owner for service binding
-            camera = provider.bindToLifecycle(
-                serviceLifecycleOwner,
-                cameraSelector,
-                imageAnalysis
-            )
-            
-            if (camera != null) {
-                LogcatManager.addLog("Service: Camera bound successfully in accessibility service - Camera instance: ${camera != null}", "Service")
-                Log.d(TAG, "Camera bound successfully in accessibility service - Camera: ${camera != null}")
-            } else {
-                Log.w(TAG, "Warning: Camera binding returned null")
-                LogcatManager.addLog("Service: Warning - Camera binding returned null", "Service")
-                
-                // Try with ProcessLifecycleOwner as fallback
-                try {
-                    camera = provider.bindToLifecycle(
-                        ProcessLifecycleOwner.get(),
-                        cameraSelector,
-                        imageAnalysis
-                    )
-                    if (camera != null) {
-                        Log.d(TAG, "Camera bound successfully using ProcessLifecycleOwner fallback")
-                        LogcatManager.addLog("Service: Camera bound using ProcessLifecycleOwner fallback", "Service")
-                    }
-                } catch (e: Exception) {
-                    Log.d(TAG, "ProcessLifecycleOwner fallback also failed: ${e.message}")
-                }
-            }
-        } catch (e: Exception) {
-            // Camera might be bound by fragment or restricted
-            val isAndroid11Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-            val isForeground = isAppInForeground(this)
-            
-            if (isAndroid11Plus && !isForeground) {
-                Log.d(TAG, "Camera binding failed - Android 11+ background restriction (may still work with AccessibilityService): ${e.message}")
-                LogcatManager.addLog("Service: Camera binding deferred: ${e.message}", "Service")
-            } else {
-                Log.d(TAG, "Camera binding conflict or error: ${e.message}")
-                LogcatManager.addLog("Service: Camera binding deferred: ${e.message}", "Service")
-            }
         }
     }
     
@@ -466,7 +421,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                 
                 // Small delay to ensure fragment's unbind completes
                 cameraRebindHandler.postDelayed({
-                    bindCameraInService()
+                    bindCameraWithFakeLifecycle()
                 }, 300) // Increased delay for more reliable handoff
             } else {
                 val cameraStatus = camera != null
@@ -562,12 +517,12 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             }
             
             // Service always updates pointer in background (AccessibilityService exemption allows this)
-            Log.d(TAG, "onResults: Updating pointer position to ($adjustedX, $adjustedY)")
+            Log.d(TAG, "Cursor update: Updating pointer position to ($adjustedX, $adjustedY)")
             PointerOverlayService.updatePointerPosition(adjustedX, adjustedY)
             MouseControlService.moveCursor(adjustedX, adjustedY)
             
             // Log every update to track cursor movement
-            Log.d(TAG, "onResults: Cursor updated to (${adjustedX.toInt()}, ${adjustedY.toInt()}) | Camera: ${camera != null}")
+            Log.d(TAG, "Cursor update: Cursor updated to (${adjustedX.toInt()}, ${adjustedY.toInt()}) | Camera: ${camera != null}")
             LogcatManager.addLog("Service: Cursor updated to (${adjustedX.toInt()}, ${adjustedY.toInt()}) | Camera: ${camera != null}", "Service")
         } catch (e: Exception) {
             Log.e(TAG, "Error processing results: ${e.message}", e)
