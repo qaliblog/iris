@@ -144,12 +144,15 @@ class SettingsFragment : Fragment() {
         setupMovementMultipliers()
         setupEyePositionEffects()
         setupDistanceMultipliers()
+        setupHeadDirectionEffects()
         setupWakeLockToggle()
         setupScreenOffTrackingToggle()
+        setupClickDragToggles()
         setupLivePreviewToggle()
         setupBlinkDetection()
         setupCursorTheming()
         setupCursorUpdateSettings()
+        setupCameraFps()
         setupPermissions()
     }
 
@@ -508,6 +511,91 @@ class SettingsFragment : Fragment() {
             settingsManager.distanceYMultiplier = newValue
             updateValue(binding.distanceYValue, newValue)
             LogcatManager.addLog("Distance Y Multiplier: ${df.format(newValue)} (increases Y range when far)", "Settings")
+        }
+    }
+
+    private fun setupHeadDirectionEffects() {
+        setupValueEditor(binding.headDirectionXMultValue,
+            { settingsManager.headDirectionXMultiplier },
+            { settingsManager.headDirectionXMultiplier = it },
+            "Head Direction X Multiplier",
+            0.1f)
+
+        binding.headDirectionXMultMinus.setOnClickListener {
+            binding.headDirectionXMultValue.clearFocus()
+            val newValue = settingsManager.headDirectionXMultiplier - 0.1f
+            settingsManager.headDirectionXMultiplier = newValue
+            updateValue(binding.headDirectionXMultValue, newValue)
+            LogcatManager.addLog("Head Direction X Multiplier: ${df.format(newValue)}", "Settings")
+        }
+
+        binding.headDirectionXMultPlus.setOnClickListener {
+            binding.headDirectionXMultValue.clearFocus()
+            val newValue = settingsManager.headDirectionXMultiplier + 0.1f
+            settingsManager.headDirectionXMultiplier = newValue
+            updateValue(binding.headDirectionXMultValue, newValue)
+            LogcatManager.addLog("Head Direction X Multiplier: ${df.format(newValue)}", "Settings")
+        }
+
+        setupValueEditor(binding.headDirectionYMultValue,
+            { settingsManager.headDirectionYMultiplier },
+            { settingsManager.headDirectionYMultiplier = it },
+            "Head Direction Y Multiplier",
+            0.1f)
+
+        binding.headDirectionYMultMinus.setOnClickListener {
+            binding.headDirectionYMultValue.clearFocus()
+            val newValue = settingsManager.headDirectionYMultiplier - 0.1f
+            settingsManager.headDirectionYMultiplier = newValue
+            updateValue(binding.headDirectionYMultValue, newValue)
+            LogcatManager.addLog("Head Direction Y Multiplier: ${df.format(newValue)}", "Settings")
+        }
+
+        binding.headDirectionYMultPlus.setOnClickListener {
+            binding.headDirectionYMultValue.clearFocus()
+            val newValue = settingsManager.headDirectionYMultiplier + 0.1f
+            settingsManager.headDirectionYMultiplier = newValue
+            updateValue(binding.headDirectionYMultValue, newValue)
+            LogcatManager.addLog("Head Direction Y Multiplier: ${df.format(newValue)}", "Settings")
+        }
+
+        // Landmark 168 Relative Y Effect
+        setupValueEditor(binding.landmark168YEffectValue,
+            { settingsManager.landmark168RelativeYEffect },
+            { settingsManager.landmark168RelativeYEffect = it },
+            "Landmark 168 Y Effect",
+            0.01f)
+
+        binding.landmark168YEffectMinus.setOnClickListener {
+            binding.landmark168YEffectValue.clearFocus()
+            val newValue = (settingsManager.landmark168RelativeYEffect - 0.01f).coerceIn(-0.1f, 0.1f)
+            settingsManager.landmark168RelativeYEffect = newValue
+            updateValue(binding.landmark168YEffectValue, newValue)
+            LogcatManager.addLog("Landmark 168 Y Effect: ${df.format(newValue)} (positive=down, negative=up)", "Settings")
+        }
+
+        binding.landmark168YEffectPlus.setOnClickListener {
+            binding.landmark168YEffectValue.clearFocus()
+            val newValue = (settingsManager.landmark168RelativeYEffect + 0.01f).coerceIn(-0.1f, 0.1f)
+            settingsManager.landmark168RelativeYEffect = newValue
+            updateValue(binding.landmark168YEffectValue, newValue)
+            LogcatManager.addLog("Landmark 168 Y Effect: ${df.format(newValue)} (positive=down, negative=up)", "Settings")
+        }
+    }
+
+    private fun setupClickDragToggles() {
+        val clickToggle = binding.root.findViewById<android.widget.Switch>(R.id.click_enabled_toggle)
+        clickToggle?.isChecked = settingsManager.clickEnabled
+        clickToggle?.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager.clickEnabled = isChecked
+            LogcatManager.addLog("Click detection: ${if (isChecked) "enabled" else "disabled"}", "Settings")
+        }
+
+        val dragToggle = binding.root.findViewById<android.widget.Switch>(R.id.drag_enabled_toggle)
+        dragToggle?.isChecked = settingsManager.dragEnabled
+        dragToggle?.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager.dragEnabled = isChecked
+            LogcatManager.addLog("Drag detection: ${if (isChecked) "enabled" else "disabled"}", "Settings")
         }
     }
 
@@ -974,6 +1062,30 @@ class SettingsFragment : Fragment() {
             settingsManager.cursorMovementDuration = newValue
             updateValue(binding.cursorMovementDurationValue, newValue.toFloat())
             LogcatManager.addLog("Movement Duration: ${newValue}ms", "Settings")
+        }
+    }
+
+    private fun setupCameraFps() {
+        setupValueEditor(binding.cameraFpsValue,
+            { settingsManager.cameraFps.toFloat() },
+            { settingsManager.cameraFps = it.toInt() },
+            "Camera FPS",
+            5f)
+
+        binding.cameraFpsMinus.setOnClickListener {
+            binding.cameraFpsValue.clearFocus()
+            val newValue = (settingsManager.cameraFps - 5).coerceIn(10, 60)
+            settingsManager.cameraFps = newValue
+            updateValue(binding.cameraFpsValue, newValue.toFloat())
+            LogcatManager.addLog("Camera FPS: ${newValue}fps (lower = faster app)", "Settings")
+        }
+
+        binding.cameraFpsPlus.setOnClickListener {
+            binding.cameraFpsValue.clearFocus()
+            val newValue = (settingsManager.cameraFps + 5).coerceIn(10, 60)
+            settingsManager.cameraFps = newValue
+            updateValue(binding.cameraFpsValue, newValue.toFloat())
+            LogcatManager.addLog("Camera FPS: ${newValue}fps (higher = smoother tracking)", "Settings")
         }
     }
 

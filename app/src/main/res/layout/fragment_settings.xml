@@ -463,6 +463,145 @@
                 android:layout_marginStart="4dp" />
         </LinearLayout>
 
+        <!-- Head Direction Effects -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Head Direction Effects"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Head Direction X Multiplier -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Head Direction X Multiplier"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/head_direction_x_mult_value"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="1.0"
+                android:textSize="14sp"
+                android:inputType="numberDecimal|numberSigned"
+                android:minWidth="120dp"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="@android:drawable/edit_text"
+                android:selectAllOnFocus="true" />
+
+            <Button
+                android:id="@+id/head_direction_x_mult_minus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="-"
+                android:layout_marginStart="8dp" />
+
+            <Button
+                android:id="@+id/head_direction_x_mult_plus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="+"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- Head Direction Y Multiplier -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Head Direction Y Multiplier"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/head_direction_y_mult_value"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="1.0"
+                android:textSize="14sp"
+                android:inputType="numberDecimal|numberSigned"
+                android:minWidth="120dp"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="@android:drawable/edit_text"
+                android:selectAllOnFocus="true" />
+
+            <Button
+                android:id="@+id/head_direction_y_mult_minus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="-"
+                android:layout_marginStart="8dp" />
+
+            <Button
+                android:id="@+id/head_direction_y_mult_plus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="+"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- Landmark 168 Relative Y Effect -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Landmark 168 Y Effect (Hover Point)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/landmark_168_y_effect_value"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="0.0"
+                android:textSize="14sp"
+                android:inputType="numberDecimal|numberSigned"
+                android:minWidth="120dp"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="@android:drawable/edit_text"
+                android:selectAllOnFocus="true" />
+
+            <Button
+                android:id="@+id/landmark_168_y_effect_minus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="-"
+                android:layout_marginStart="8dp" />
+
+            <Button
+                android:id="@+id/landmark_168_y_effect_plus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="+"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
         <!-- Wake Lock Toggle -->
         <TextView
             android:layout_width="match_parent"
@@ -510,6 +649,58 @@
 
             <android.widget.Switch
                 android:id="@+id/screen_off_tracking_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- Click and Drag Controls -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Click and Drag Controls"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Enable Click Toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Enable Click Detection"
+                android:textSize="14sp" />
+
+            <android.widget.Switch
+                android:id="@+id/click_enabled_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- Enable Drag Toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Enable Drag Detection"
+                android:textSize="14sp" />
+
+            <android.widget.Switch
+                android:id="@+id/drag_enabled_toggle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />
         </LinearLayout>
@@ -827,6 +1018,59 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Choose Color" />
+        </LinearLayout>
+
+        <!-- Performance Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Performance Settings"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Camera FPS -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Camera FPS (Lower = Faster App)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/camera_fps_value"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:text="30"
+                android:textSize="14sp"
+                android:inputType="number"
+                android:minWidth="80dp"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="@android:drawable/edit_text"
+                android:selectAllOnFocus="true" />
+
+            <Button
+                android:id="@+id/camera_fps_minus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="-"
+                android:layout_marginStart="8dp" />
+
+            <Button
+                android:id="@+id/camera_fps_plus"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="+"
+                android:layout_marginStart="4dp" />
         </LinearLayout>
 
         <!-- Cursor Update Settings -->

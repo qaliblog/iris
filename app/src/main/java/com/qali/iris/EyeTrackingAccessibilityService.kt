@@ -47,10 +47,17 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
         }
         
         /**
-         * Get wake lock state
+         * Get wake lock state - checks actual wake lock state, not just the flag
          */
         fun getWakeLockState(): Boolean {
-            return instance?.isWakeLockEnabled ?: false
+            val service = instance ?: return false
+            // Check actual wake lock state and sync the flag
+            val actualState = service.getWakeLockActualState()
+            // Sync the flag with actual state
+            if (service.isWakeLockEnabled != actualState) {
+                service.isWakeLockEnabled = actualState
+            }
+            return actualState
         }
         
         /**
@@ -135,6 +142,13 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
     private var wakeLock: PowerManager.WakeLock? = null
     private var isWakeLockEnabled = true
     
+    /**
+     * Get actual wake lock state (for internal use)
+     */
+    private fun getWakeLockActualState(): Boolean {
+        return wakeLock?.isHeld ?: false
+    }
+    
     // Mouse service reconnect listener
     private val mouseServiceReconnectListener: (MouseControlService) -> Unit = { service ->
         settingsManager?.let { service.setSettingsManager(it) }
@@ -178,7 +192,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
         if (settingsManager!!.screenOffTracking) {
             try {
                 wakeLock?.acquire()
-                isWakeLockEnabled = true
+                isWakeLockEnabled = wakeLock?.isHeld ?: false
                 Log.d(TAG, "PARTIAL_WAKE_LOCK acquired - CPU will stay awake when screen is off")
                 LogcatManager.addLog("Wake lock acquired - CPU will stay awake when screen is off", "Service")
             } catch (e: Exception) {
@@ -191,6 +205,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             LogcatManager.addLog("Screen off tracking disabled - wake lock not acquired", "Service")
         }
         eyeTracker = EyeTracker(displayMetrics!!, settingsManager!!.useOneEyeDetection)
+        eyeTracker.setLandmark168RelativeYEffect(settingsManager!!.landmark168RelativeYEffect)
         trackingCalculator = TrackingCalculator(settingsManager!!, displayMetrics!!)
         eyeBlinkDetector = EyeBlinkDetector(
             initialBlinkThreshold = settingsManager!!.blinkThreshold,
@@ -285,8 +300,10 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                 
                 // Build image analysis use case
                 // Must use RGBA_8888 format to match MediaPipe FaceLandmarkerHelper requirements
+                val fpsRange = android.util.Range(settingsManager!!.cameraFps, settingsManager!!.cameraFps)
                 imageAnalysis = ImageAnalysis.Builder()
                     .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .setTargetFrameRate(fpsRange)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
@@ -302,6 +319,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                             
                             // Update settings dynamically
                             eyeTracker?.setUseOneEye(settingsManager?.useOneEyeDetection ?: false)
+                            eyeTracker?.setLandmark168RelativeYEffect(settingsManager?.landmark168RelativeYEffect ?: 0f)
                             eyeBlinkDetector?.setBlinkThreshold(settingsManager?.blinkThreshold ?: 0.3f)
                             eyeBlinkDetector?.setHalfBlinkAccelThreshold(settingsManager?.halfBlinkAccelThreshold ?: 0.15f)
                             eyeBlinkDetector?.setClickDelayThreshold(settingsManager?.clickDelayThreshold ?: 200L)
@@ -514,6 +532,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             
             // Update eye tracker settings
             eyeTracker?.setUseOneEye(settingsManager?.useOneEyeDetection ?: false)
+            eyeTracker?.setLandmark168RelativeYEffect(settingsManager?.landmark168RelativeYEffect ?: 0f)
             
             // Track eyes
             val trackingResult = eyeTracker?.trackEyes(landmarks) ?: return
@@ -584,13 +603,16 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
      * Toggle wake lock on/off
      */
     private fun toggleWakeLock() {
-        isWakeLockEnabled = !isWakeLockEnabled
+        // Get current actual state
+        val currentState = wakeLock?.isHeld ?: false
+        isWakeLockEnabled = !currentState
         
         if (isWakeLockEnabled) {
             wakeLock?.let {
                 if (!it.isHeld) {
                     try {
                         it.acquire()
+                        isWakeLockEnabled = it.isHeld
                         Log.d(TAG, "PARTIAL_WAKE_LOCK acquired - CPU will stay awake when screen is off")
                         LogcatManager.addLog("Wake lock enabled - CPU will stay awake when screen is off", "Service")
                     } catch (e: Exception) {
@@ -598,6 +620,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                         isWakeLockEnabled = false
                     }
                 } else {
+                    isWakeLockEnabled = true
                     Log.d(TAG, "Wake lock already held")
                 }
             } ?: run {
@@ -609,6 +632,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                     setReferenceCounted(false)
                     try {
                         acquire()
+                        isWakeLockEnabled = isHeld
                         Log.d(TAG, "PARTIAL_WAKE_LOCK created and acquired - CPU will stay awake when screen is off")
                         LogcatManager.addLog("Wake lock enabled - CPU will stay awake when screen is off", "Service")
                     } catch (e: Exception) {
@@ -622,12 +646,15 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                 if (it.isHeld) {
                     try {
                         it.release()
+                        isWakeLockEnabled = false
                         Log.d(TAG, "PARTIAL_WAKE_LOCK released - CPU may sleep when screen is off")
                         LogcatManager.addLog("Wake lock disabled - CPU may sleep when screen is off", "Service")
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to release wake lock: ${e.message}", e)
+                        isWakeLockEnabled = it.isHeld
                     }
                 } else {
+                    isWakeLockEnabled = false
                     Log.d(TAG, "Wake lock was not held, skipping release")
                 }
             }
@@ -639,20 +666,23 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
      */
     private fun updateWakeLockFromSettings() {
         val shouldBeEnabled = settingsManager?.screenOffTracking ?: true
+        val currentState = wakeLock?.isHeld ?: false
         
-        if (shouldBeEnabled && !isWakeLockEnabled) {
+        if (shouldBeEnabled && !currentState) {
             // Need to acquire wake lock
             wakeLock?.let {
                 if (!it.isHeld) {
                     try {
                         it.acquire()
-                        isWakeLockEnabled = true
+                        isWakeLockEnabled = it.isHeld
                         Log.d(TAG, "PARTIAL_WAKE_LOCK acquired from settings - CPU will stay awake when screen is off")
                         LogcatManager.addLog("Screen off tracking enabled - wake lock acquired", "Service")
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to acquire wake lock from settings: ${e.message}", e)
                         isWakeLockEnabled = false
                     }
+                } else {
+                    isWakeLockEnabled = true
                 }
             } ?: run {
                 val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -663,7 +693,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                     setReferenceCounted(false)
                     try {
                         acquire()
-                        isWakeLockEnabled = true
+                        isWakeLockEnabled = isHeld
                         Log.d(TAG, "PARTIAL_WAKE_LOCK created and acquired from settings - CPU will stay awake when screen is off")
                         LogcatManager.addLog("Screen off tracking enabled - wake lock acquired", "Service")
                     } catch (e: Exception) {
@@ -672,7 +702,7 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                     }
                 }
             }
-        } else if (!shouldBeEnabled && isWakeLockEnabled) {
+        } else if (!shouldBeEnabled && currentState) {
             // Need to release wake lock
             wakeLock?.let {
                 if (it.isHeld) {
@@ -683,11 +713,15 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                         LogcatManager.addLog("Screen off tracking disabled - wake lock released", "Service")
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to release wake lock from settings: ${e.message}", e)
+                        isWakeLockEnabled = it.isHeld
                     }
                 } else {
                     isWakeLockEnabled = false
                 }
             }
+        } else {
+            // Sync flag with actual state
+            isWakeLockEnabled = currentState
         }
     }
     

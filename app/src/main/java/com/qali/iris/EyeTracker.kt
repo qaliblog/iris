@@ -17,11 +17,22 @@ class EyeTracker(
     private var useOneEye: Boolean = false
 ) {
     
+    // Landmark 168 relative Y effect - adjusts Y position of landmark 168 for head direction calculation
+    private var landmark168RelativeYEffect: Float = 0f
+    
     /**
      * Set whether to use one eye (true) or both eyes (false) for detection
      */
     fun setUseOneEye(useOneEye: Boolean) {
         this.useOneEye = useOneEye
+    }
+    
+    /**
+     * Set landmark 168 relative Y effect to adjust head direction calculation
+     * Positive = shifts head direction down, Negative = shifts head direction up
+     */
+    fun setLandmark168RelativeYEffect(effect: Float) {
+        this.landmark168RelativeYEffect = effect.coerceIn(-0.1f, 0.1f)
     }
     
     companion object {
@@ -196,14 +207,18 @@ class EyeTracker(
         val landmark417 = landmarks.getOrNull(417) ?: return null
         val landmark8 = landmarks.getOrNull(8) ?: return null
         
+        // Apply landmark 168 relative Y effect to adjust head direction
+        val adjustedLandmark168Y = landmark168.y() + landmark168RelativeYEffect
+        
         // Calculate weighted point (centroid) of all four landmarks
+        // Use adjusted Y for landmark 168 in weighted calculation
         val weightedX = (landmark193.x() + landmark168.x() + landmark417.x() + landmark8.x()) / 4f
-        val weightedY = (landmark193.y() + landmark168.y() + landmark417.y() + landmark8.y()) / 4f
+        val weightedY = (landmark193.y() + adjustedLandmark168Y + landmark417.y() + landmark8.y()) / 4f
         val weightedPoint = PointF(weightedX, weightedY)
         
-        // Calculate direction vector from weighted point toward landmark 168
+        // Calculate direction vector from weighted point toward adjusted landmark 168
         val directionX = landmark168.x() - weightedX
-        val directionY = landmark168.y() - weightedY
+        val directionY = adjustedLandmark168Y - weightedY
         
         // Normalize the direction vector
         val magnitude = kotlin.math.sqrt(directionX * directionX + directionY * directionY)

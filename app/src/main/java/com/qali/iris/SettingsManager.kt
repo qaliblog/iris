@@ -64,6 +64,12 @@ class SettingsManager(context: Context) {
         get() = prefs.getFloat(KEY_CURSOR_SMOOTHING, 0.7f)
         set(value) = prefs.edit().putFloat(KEY_CURSOR_SMOOTHING, value.coerceIn(0f, 1f)).apply()
     
+    // Camera FPS (default 30fps)
+    // Lower = better performance, higher = smoother tracking
+    var cameraFps: Int
+        get() = prefs.getInt(KEY_CAMERA_FPS, 30)
+        set(value) = prefs.edit().putInt(KEY_CAMERA_FPS, value.coerceIn(10, 60)).apply()
+    
     // Cursor update interval in milliseconds (default 16ms = ~60fps)
     // Lower = more frequent updates (smoother), higher = less frequent (better performance)
     var cursorUpdateInterval: Long
@@ -152,6 +158,13 @@ class SettingsManager(context: Context) {
         get() = prefs.getFloat(KEY_HEAD_DIRECTION_Y_NEGATIVE_THRESHOLD, -0.01f)
         set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_Y_NEGATIVE_THRESHOLD, value.coerceIn(-1f, 0f)).apply()
     
+    // Landmark 168 relative Y effect - adjusts Y position of landmark 168 for head direction calculation
+    // Positive = shifts head direction down, Negative = shifts head direction up
+    // Range: -0.1 to 0.1 (normalized coordinates)
+    var landmark168RelativeYEffect: Float
+        get() = prefs.getFloat(KEY_LANDMARK_168_RELATIVE_Y_EFFECT, 0f)
+        set(value) = prefs.edit().putFloat(KEY_LANDMARK_168_RELATIVE_Y_EFFECT, value.coerceIn(-0.1f, 0.1f)).apply()
+    
     // Enable click detection
     var clickEnabled: Boolean
         get() = prefs.getBoolean(KEY_CLICK_ENABLED, true)
@@ -196,6 +209,7 @@ class SettingsManager(context: Context) {
         private const val KEY_BLINK_THRESHOLD = "blink_threshold"
         private const val KEY_USE_ONE_EYE = "use_one_eye"
         private const val KEY_CURSOR_SMOOTHING = "cursor_smoothing"
+        private const val KEY_CAMERA_FPS = "camera_fps"
         private const val KEY_CURSOR_UPDATE_INTERVAL = "cursor_update_interval"
         private const val KEY_CURSOR_MOVEMENT_DURATION = "cursor_movement_duration"
         private const val KEY_HALF_BLINK_ACCEL_THRESHOLD = "half_blink_accel_threshold"
@@ -213,6 +227,7 @@ class SettingsManager(context: Context) {
         private const val KEY_HEAD_DIRECTION_X_NEGATIVE_THRESHOLD = "head_direction_x_negative_threshold"
         private const val KEY_HEAD_DIRECTION_Y_POSITIVE_THRESHOLD = "head_direction_y_positive_threshold"
         private const val KEY_HEAD_DIRECTION_Y_NEGATIVE_THRESHOLD = "head_direction_y_negative_threshold"
+        private const val KEY_LANDMARK_168_RELATIVE_Y_EFFECT = "landmark_168_relative_y_effect"
         private const val KEY_CLICK_ENABLED = "click_enabled"
         private const val KEY_DRAG_ENABLED = "drag_enabled"
         private const val KEY_CLICK_POSITIVE_THRESHOLD = "click_positive_threshold"

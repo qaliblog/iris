@@ -204,8 +204,9 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         super.onViewCreated(view, savedInstanceState)
 
         val displayMetrics = resources.displayMetrics
-        eyeTracker = EyeTracker(displayMetrics)
         settingsManager = SettingsManager(requireContext())
+        eyeTracker = EyeTracker(displayMetrics)
+        eyeTracker.setLandmark168RelativeYEffect(settingsManager.landmark168RelativeYEffect)
         trackingCalculator = TrackingCalculator(settingsManager, displayMetrics)
 
         MouseControlService.getInstance()?.setSettingsManager(settingsManager)
@@ -398,9 +399,11 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
             .setTargetRotation(rotation)
             .build()
 
+        val fpsRange = android.util.Range(settingsManager.cameraFps, settingsManager.cameraFps)
         imageAnalyzer = ImageAnalysis.Builder()
             .setTargetAspectRatio(AspectRatio.RATIO_4_3)
             .setTargetRotation(rotation)
+            .setTargetFrameRate(fpsRange)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
@@ -445,6 +448,7 @@ class CameraFragment : Fragment(), FaceLandmarkerHelper.LandmarkerListener {
         val landmarks = resultBundle.result.faceLandmarks().firstOrNull() ?: return
 
         eyeTracker.setUseOneEye(settingsManager.useOneEyeDetection)
+        eyeTracker.setLandmark168RelativeYEffect(settingsManager.landmark168RelativeYEffect)
         val trackingResult = eyeTracker.trackEyes(landmarks)
         val (adjustedX, adjustedY) = trackingCalculator.calculateAdjustedPosition(trackingResult)
 
