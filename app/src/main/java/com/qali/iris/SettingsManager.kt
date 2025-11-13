@@ -112,6 +112,26 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_SCREEN_OFF_TRACKING, true)
         set(value) = prefs.edit().putBoolean(KEY_SCREEN_OFF_TRACKING, value).apply()
     
+    // Head direction X threshold - minimum movement to apply head direction effect on X axis
+    var headDirectionXThreshold: Float
+        get() = prefs.getFloat(KEY_HEAD_DIRECTION_X_THRESHOLD, 0.01f)
+        set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_X_THRESHOLD, value.coerceIn(0f, 1f)).apply()
+    
+    // Head direction Y threshold - minimum movement to apply head direction effect on Y axis
+    var headDirectionYThreshold: Float
+        get() = prefs.getFloat(KEY_HEAD_DIRECTION_Y_THRESHOLD, 0.01f)
+        set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_Y_THRESHOLD, value.coerceIn(0f, 1f)).apply()
+    
+    // Head direction X effect multiplier - how much head direction affects X movement
+    var headDirectionXMultiplier: Float
+        get() = prefs.getFloat(KEY_HEAD_DIRECTION_X_MULTIPLIER, 1.0f)
+        set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_X_MULTIPLIER, value).apply()
+    
+    // Head direction Y effect multiplier - how much head direction affects Y movement
+    var headDirectionYMultiplier: Float
+        get() = prefs.getFloat(KEY_HEAD_DIRECTION_Y_MULTIPLIER, 1.0f)
+        set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_Y_MULTIPLIER, value).apply()
+    
     companion object {
         private const val PREFS_NAME = "iris_settings"
         
@@ -135,5 +155,9 @@ class SettingsManager(context: Context) {
         private const val KEY_DRAG_COLOR = "drag_color"
         private const val KEY_SHOW_LIVE_PREVIEW = "show_live_preview"
         private const val KEY_SCREEN_OFF_TRACKING = "screen_off_tracking"
+        private const val KEY_HEAD_DIRECTION_X_THRESHOLD = "head_direction_x_threshold"
+        private const val KEY_HEAD_DIRECTION_Y_THRESHOLD = "head_direction_y_threshold"
+        private const val KEY_HEAD_DIRECTION_X_MULTIPLIER = "head_direction_x_multiplier"
+        private const val KEY_HEAD_DIRECTION_Y_MULTIPLIER = "head_direction_y_multiplier"
     }
 }

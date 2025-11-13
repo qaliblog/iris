@@ -32,6 +32,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
     private var rightEyeLinePaint = Paint()
     private var leftEyePupilPaint = Paint()
     private var rightEyePupilPaint = Paint()
+    private var headDirectionPaint = Paint()
     private var eyeTracker: EyeTracker? = null
     private var pointerX: Float = -1f
     private var pointerY: Float = -1f
@@ -97,6 +98,13 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         rightEyePupilPaint.color = Color.BLUE
         rightEyePupilPaint.strokeWidth = PUPIL_STROKE_WIDTH
         rightEyePupilPaint.style = Paint.Style.FILL
+        
+        // Head direction line paint (red)
+        headDirectionPaint.color = Color.RED
+        headDirectionPaint.strokeWidth = 4f
+        headDirectionPaint.style = Paint.Style.STROKE
+        headDirectionPaint.strokeCap = Paint.Cap.ROUND
+        headDirectionPaint.isAntiAlias = true
     }
 
     override fun draw(canvas: Canvas) {
@@ -129,8 +137,60 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
             // Iterate through each detected face
             faceLandmarkerResult.faceLandmarks().forEach { faceLandmarks ->
                 drawEyeLandmarks(canvas, faceLandmarks, offsetX, offsetY)
+                drawHeadDirection(canvas, faceLandmarks, offsetX, offsetY)
             }
         }
+    }
+    
+    /**
+     * Draw head direction line from weighted point of landmarks 193, 168, 417, 8 toward landmark 168
+     */
+    private fun drawHeadDirection(
+        canvas: Canvas,
+        faceLandmarks: List<NormalizedLandmark>,
+        offsetX: Float,
+        offsetY: Float
+    ) {
+        // Get the four landmarks for head direction
+        val landmark193 = faceLandmarks.getOrNull(193) ?: return
+        val landmark168 = faceLandmarks.getOrNull(168) ?: return
+        val landmark417 = faceLandmarks.getOrNull(417) ?: return
+        val landmark8 = faceLandmarks.getOrNull(8) ?: return
+        
+        // Calculate weighted point (centroid) of all four landmarks
+        val weightedX = (landmark193.x() + landmark168.x() + landmark417.x() + landmark8.x()) / 4f
+        val weightedY = (landmark193.y() + landmark168.y() + landmark417.y() + landmark8.y()) / 4f
+        
+        // Convert to canvas coordinates
+        val weightedCanvasX = weightedX * imageWidth * scaleFactor + offsetX
+        val weightedCanvasY = weightedY * imageHeight * scaleFactor + offsetY
+        
+        // Calculate direction vector from weighted point toward landmark 168
+        val directionX = landmark168.x() - weightedX
+        val directionY = landmark168.y() - weightedY
+        
+        // Normalize the direction vector
+        val magnitude = kotlin.math.sqrt(directionX * directionX + directionY * directionY)
+        if (magnitude <= 0) return
+        
+        val normalizedDirectionX = directionX / magnitude
+        val normalizedDirectionY = directionY / magnitude
+        
+        // Extend the line forward (multiply by a factor to extend beyond landmark 168)
+        val extensionFactor = 2.0f // Extend 2x the distance to landmark 168
+        val extendedX = weightedX + normalizedDirectionX * magnitude * extensionFactor
+        val extendedY = weightedY + normalizedDirectionY * magnitude * extensionFactor
+        
+        // Convert extended point to canvas coordinates
+        val extendedCanvasX = extendedX * imageWidth * scaleFactor + offsetX
+        val extendedCanvasY = extendedY * imageHeight * scaleFactor + offsetY
+        
+        // Draw the line from weighted point toward landmark 168, extended forward
+        canvas.drawLine(weightedCanvasX, weightedCanvasY, extendedCanvasX, extendedCanvasY, headDirectionPaint)
+        
+        // Draw a small circle at the weighted point
+        val fillPaint = Paint(headDirectionPaint).apply { style = Paint.Style.FILL }
+        canvas.drawCircle(weightedCanvasX, weightedCanvasY, 5f, fillPaint)
     }
     
     private fun drawClickDot(canvas: Canvas, x: Float, y: Float) {

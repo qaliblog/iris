@@ -79,6 +79,14 @@ class PointerOverlayService : Service() {
         fun indicateDragEnd() {
             instance?.pointerView?.indicateDragEnd()
         }
+        
+        /**
+         * Recreate the overlay window with the correct type based on accessibility service state
+         * Call this when accessibility service is enabled/disabled
+         */
+        fun recreateOverlayIfNeeded() {
+            instance?.recreateOverlayWindow()
+        }
     }
     
     var pointerView: PointerView? = null
@@ -176,23 +184,17 @@ class PointerOverlayService : Service() {
         pointerLayout?.addView(pointerView)
         
         // Determine window type based on Android version
-        // Android 8.0+ (API 26+): TYPE_ACCESSIBILITY_OVERLAY is available for accessibility services
-        // This allows overlay updates even when app is in background on Android 15+
+        // For accessibility services, TYPE_ACCESSIBILITY_OVERLAY (2038) is the correct type
+        // This allows overlay to appear on top of all apps and bypasses Android 15+ restrictions
         val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Check if we're running as an accessibility service (which we are via EyeTrackingAccessibilityService)
-            // TYPE_ACCESSIBILITY_OVERLAY (2038) is available from API 26+
-            // For Android 15+, this is preferred for accessibility services
-            if (Build.VERSION.SDK_INT >= 35 && EyeTrackingAccessibilityService.isEnabled()) {
-                // Android 15+ with accessibility service: Use TYPE_ACCESSIBILITY_OVERLAY
-                // This bypasses background overlay update restrictions
-                try {
-                    // TYPE_ACCESSIBILITY_OVERLAY = 2038 (available from API 26+)
-                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-                } catch (e: Exception) {
-                    Log.w(TAG, "TYPE_ACCESSIBILITY_OVERLAY not available, using TYPE_APPLICATION_OVERLAY: ${e.message}")
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                }
+            // Check if accessibility service is enabled - if so, use TYPE_ACCESSIBILITY_OVERLAY
+            // This is the proper way for clicker apps and accessibility overlays
+            if (EyeTrackingAccessibilityService.isEnabled()) {
+                // TYPE_ACCESSIBILITY_OVERLAY = 2038 (available from API 26+)
+                // This allows overlay on top of all apps when accessibility service is enabled
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
             } else {
+                // Fallback to TYPE_APPLICATION_OVERLAY if accessibility service not enabled
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             }
         } else {
@@ -209,12 +211,18 @@ class PointerOverlayService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = -1000 // Start off-screen until we get valid coordinates
             y = -1000
+            // For TYPE_ACCESSIBILITY_OVERLAY, ensure it's above everything
+            if (windowType == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY) {
+                // Set high z-order to ensure it's on top
+                type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+            }
         }
         
         try {
@@ -264,30 +272,36 @@ class PointerOverlayService : Service() {
                 val screenX = x.toInt() - 30 // Center the pointer (60/2)
                 val screenY = y.toInt() - 30
                 
-                // Android 15+ restriction: Only update overlay if:
-                // 1. EyeTrackingAccessibilityService is enabled (bypasses restriction), OR
-                // 2. App is in foreground
+                // For TYPE_ACCESSIBILITY_OVERLAY, updates are always allowed when accessibility service is enabled
+                // This is the key difference from TYPE_APPLICATION_OVERLAY
                 val isAccessibilityEnabled = EyeTrackingAccessibilityService.isEnabled()
                 val isForeground = isAppInForeground(this)
-                val canUpdateOverlay = isAccessibilityEnabled || isForeground
+                val usingAccessibilityOverlay = (pointerLayout?.layoutParams as? WindowManager.LayoutParams)?.type == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
                 
-                // Check overlay permission
+                // Check overlay permission (still needed for TYPE_APPLICATION_OVERLAY fallback)
                 val canDrawOverlays = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     Settings.canDrawOverlays(this)
                 } else {
                     true
                 }
                 
-                Log.d(TAG, "updatePointer: screenX=$screenX, screenY=$screenY, accessibility=$isAccessibilityEnabled, foreground=$isForeground, canDrawOverlays=$canDrawOverlays")
-                
-                if (!canDrawOverlays) {
-                    Log.w(TAG, "updatePointer: Overlay permission not granted - cannot update pointer")
-                    return
+                // Can update if:
+                // 1. Using TYPE_ACCESSIBILITY_OVERLAY and accessibility service is enabled (always works), OR
+                // 2. Using TYPE_APPLICATION_OVERLAY and (accessibility enabled OR app in foreground) AND has overlay permission
+                val canUpdateOverlay = if (usingAccessibilityOverlay) {
+                    isAccessibilityEnabled // TYPE_ACCESSIBILITY_OVERLAY works when accessibility is enabled
+                } else {
+                    (isAccessibilityEnabled || isForeground) && canDrawOverlays // TYPE_APPLICATION_OVERLAY needs permission
                 }
                 
+                Log.d(TAG, "updatePointer: screenX=$screenX, screenY=$screenY, accessibility=$isAccessibilityEnabled, foreground=$isForeground, usingAccessibilityOverlay=$usingAccessibilityOverlay, canDrawOverlays=$canDrawOverlays")
+                
                 if (!canUpdateOverlay) {
-                    // Android 15 restriction: Cannot update overlay in background without accessibility
-                    Log.w(TAG, "updatePointer: Overlay update blocked - Android 15 restriction (accessibility=$isAccessibilityEnabled, foreground=$isForeground)")
+                    if (!usingAccessibilityOverlay && !canDrawOverlays) {
+                        Log.w(TAG, "updatePointer: Overlay permission not granted - cannot update pointer")
+                    } else if (!usingAccessibilityOverlay && !isForeground && !isAccessibilityEnabled) {
+                        Log.w(TAG, "updatePointer: Overlay update blocked - Android 15 restriction (accessibility=$isAccessibilityEnabled, foreground=$isForeground)")
+                    }
                     return
                 }
                 
@@ -323,6 +337,26 @@ class PointerOverlayService : Service() {
         } ?: run {
             Log.w(TAG, "updatePointer: Pointer layout is null, cannot update pointer")
         }
+    }
+    
+    /**
+     * Recreate the overlay window with the correct type
+     * Useful when accessibility service state changes
+     */
+    private fun recreateOverlayWindow() {
+        pointerLayout?.let { oldLayout ->
+            try {
+                // Remove old overlay
+                windowManager?.removeView(oldLayout)
+                Log.d(TAG, "Removed old overlay window for recreation")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error removing old overlay: ${e.message}", e)
+            }
+        }
+        
+        // Create new overlay with correct type
+        createPointerView()
+        Log.d(TAG, "Recreated overlay window with correct type")
     }
     
     override fun onDestroy() {

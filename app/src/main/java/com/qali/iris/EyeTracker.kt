@@ -42,6 +42,10 @@ class EyeTracker(
         // Use approximate center indices or calculate from eye region
         private const val LEFT_EYE_PUPIL_CENTER = 468 // Will be calculated from eye region if not available
         private const val RIGHT_EYE_PUPIL_CENTER = 473 // Will be calculated from eye region if not available
+        
+        // Head direction landmarks - indices 193, 168, 417, 8
+        private val HEAD_DIRECTION_LANDMARKS = listOf(193, 168, 417, 8)
+        private const val HEAD_DIRECTION_TARGET = 168 // Direction point (extend line toward this landmark)
     }
     
     data class EyeRegion(
@@ -59,6 +63,14 @@ class EyeTracker(
         val lowerLidY: Float  // Y position of lower eyelid (normalized 0-1, higher Y = more closed)
     )
     
+    data class HeadDirection(
+        val weightedPoint: PointF, // Weighted center point of landmarks 193, 168, 417, 8
+        val directionPoint: PointF, // Point toward landmark 168 (extended forward)
+        val directionVector: PointF, // Normalized direction vector (x, y components)
+        val directionX: Float, // X component of head direction (-1 to 1, negative = left, positive = right)
+        val directionY: Float  // Y component of head direction (-1 to 1, negative = up, positive = down)
+    )
+    
     data class TrackingResult(
         val leftEyeRegion: EyeRegion?,
         val rightEyeRegion: EyeRegion?,
@@ -69,7 +81,8 @@ class EyeTracker(
         val eyePositionX: Float = 0f, // Normalized X position of eyes (0-1)
         val eyePositionY: Float = 0f,  // Normalized Y position of eyes (0-1)
         val leftEyelidLandmarks: EyelidLandmarks? = null, // Eyelid landmarks for left eye
-        val rightEyelidLandmarks: EyelidLandmarks? = null  // Eyelid landmarks for right eye
+        val rightEyelidLandmarks: EyelidLandmarks? = null, // Eyelid landmarks for right eye
+        val headDirection: HeadDirection? = null // Head direction calculation
     )
     
     /**
@@ -169,6 +182,51 @@ class EyeTracker(
         return EyelidLandmarks(
             upperLidY = upperLidY,
             lowerLidY = lowerLidY
+        )
+    }
+    
+    /**
+     * Calculate head direction from landmarks 193, 168, 417, 8
+     * Returns weighted point and direction vector toward landmark 168
+     */
+    private fun calculateHeadDirection(landmarks: List<NormalizedLandmark>): HeadDirection? {
+        // Get the four landmarks
+        val landmark193 = landmarks.getOrNull(193) ?: return null
+        val landmark168 = landmarks.getOrNull(168) ?: return null
+        val landmark417 = landmarks.getOrNull(417) ?: return null
+        val landmark8 = landmarks.getOrNull(8) ?: return null
+        
+        // Calculate weighted point (centroid) of all four landmarks
+        val weightedX = (landmark193.x() + landmark168.x() + landmark417.x() + landmark8.x()) / 4f
+        val weightedY = (landmark193.y() + landmark168.y() + landmark417.y() + landmark8.y()) / 4f
+        val weightedPoint = PointF(weightedX, weightedY)
+        
+        // Calculate direction vector from weighted point toward landmark 168
+        val directionX = landmark168.x() - weightedX
+        val directionY = landmark168.y() - weightedY
+        
+        // Normalize the direction vector
+        val magnitude = kotlin.math.sqrt(directionX * directionX + directionY * directionY)
+        val normalizedDirectionX = if (magnitude > 0) directionX / magnitude else 0f
+        val normalizedDirectionY = if (magnitude > 0) directionY / magnitude else 0f
+        
+        // Extend the line forward (multiply by a factor to extend beyond landmark 168)
+        val extensionFactor = 2.0f // Extend 2x the distance to landmark 168
+        val extendedX = weightedX + normalizedDirectionX * magnitude * extensionFactor
+        val extendedY = weightedY + normalizedDirectionY * magnitude * extensionFactor
+        val directionPoint = PointF(extendedX, extendedY)
+        
+        // Calculate direction components normalized to -1 to 1 range
+        // X: negative = left, positive = right
+        // Y: negative = up, positive = down
+        val directionVector = PointF(normalizedDirectionX, normalizedDirectionY)
+        
+        return HeadDirection(
+            weightedPoint = weightedPoint,
+            directionPoint = directionPoint,
+            directionVector = directionVector,
+            directionX = normalizedDirectionX,
+            directionY = normalizedDirectionY
         )
     }
     
@@ -325,6 +383,9 @@ class EyeTracker(
             }
         }
         
+        // Calculate head direction
+        val headDirection = calculateHeadDirection(landmarks)
+        
         return TrackingResult(
             leftEyeRegion = leftEyeRegion,
             rightEyeRegion = rightEyeRegion,
@@ -335,7 +396,8 @@ class EyeTracker(
             eyePositionX = eyePosX,
             eyePositionY = eyePosY,
             leftEyelidLandmarks = leftEyelidLandmarks,
-            rightEyelidLandmarks = rightEyelidLandmarks
+            rightEyelidLandmarks = rightEyelidLandmarks,
+            headDirection = headDirection
         )
     }
     

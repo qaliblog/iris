@@ -207,6 +207,13 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             val pointerIntent = android.content.Intent(this, PointerOverlayService::class.java)
             startService(pointerIntent)
             LogcatManager.addLog("Pointer overlay service started from accessibility service", "Service")
+            
+            // Recreate overlay after a short delay to ensure it uses TYPE_ACCESSIBILITY_OVERLAY
+            // This handles the case where overlay was created before accessibility service was enabled
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                PointerOverlayService.recreateOverlayIfNeeded()
+                Log.d(TAG, "Recreated overlay window to use TYPE_ACCESSIBILITY_OVERLAY")
+            }, 500)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start pointer service: ${e.message}", e)
         }

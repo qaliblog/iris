@@ -34,8 +34,33 @@ class TrackingCalculator(private val settings: SettingsManager, private val disp
         val distanceXRange = if (settings.distanceXMultiplier == 0f) 1f else (1f + result.eyeArea * settings.distanceXMultiplier)
         val distanceYRange = if (settings.distanceYMultiplier == 0f) 1f else (1f + result.eyeArea * settings.distanceYMultiplier)
         
-        val finalMovementX = adjustedMovementX * distanceXRange
-        val finalMovementY = adjustedMovementY * distanceYRange
+        var finalMovementX = adjustedMovementX * distanceXRange
+        var finalMovementY = adjustedMovementY * distanceYRange
+        
+        // Apply head direction effect with thresholds
+        result.headDirection?.let { headDir ->
+            // Get head direction components (-1 to 1)
+            val headDirX = headDir.directionX
+            val headDirY = headDir.directionY
+            
+            // Apply thresholds - only apply head direction if it exceeds threshold
+            val headDirXEffect = if (kotlin.math.abs(headDirX) >= settings.headDirectionXThreshold) {
+                headDirX * settings.headDirectionXMultiplier
+            } else {
+                0f // Below threshold, no effect
+            }
+            
+            val headDirYEffect = if (kotlin.math.abs(headDirY) >= settings.headDirectionYThreshold) {
+                headDirY * settings.headDirectionYMultiplier
+            } else {
+                0f // Below threshold, no effect
+            }
+            
+            // Apply head direction effect to movement
+            // Head direction is normalized (-1 to 1), so we scale it appropriately
+            finalMovementX += headDirXEffect * 0.5f // Scale to match movement range
+            finalMovementY += headDirYEffect * 0.5f
+        }
         
         // Apply movement multipliers (overall X/Y range)
         val finalX = screenCenterX + (finalMovementX * settings.xMovementMultiplier * displayMetrics.widthPixels)
