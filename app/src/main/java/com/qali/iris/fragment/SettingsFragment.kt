@@ -18,6 +18,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.SeekBar
 import android.widget.TextView
+import com.qali.iris.EyeTrackingAccessibilityService
 import com.qali.iris.LogcatManager
 import com.qali.iris.PointerOverlayService
 import com.qali.iris.R
@@ -166,7 +167,7 @@ class SettingsFragment : Fragment() {
 
         // Update wake lock toggle state in case it changed
         _binding?.let {
-            val isEnabled = com.qali.iris.EyeTrackingAccessibilityService.getWakeLockState()
+            val isEnabled = EyeTrackingAccessibilityService.getWakeLockState()
             val switch = it.root.findViewById<android.widget.Switch>(R.id.wake_lock_toggle)
             switch?.isChecked = isEnabled
 
@@ -641,25 +642,25 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupWakeLockToggle() {
-        val isEnabled = com.qali.iris.EyeTrackingAccessibilityService.getWakeLockState()
+        val isEnabled = EyeTrackingAccessibilityService.getWakeLockState()
         val wakeLockSwitch = binding.root.findViewById<android.widget.Switch>(R.id.wake_lock_toggle)
         wakeLockSwitch?.isChecked = isEnabled
 
         wakeLockSwitch?.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                val service = com.qali.iris.EyeTrackingAccessibilityService.getInstance()
+                val service = EyeTrackingAccessibilityService.getInstance()
                 if (service == null) {
                     // Service not running - user needs to enable accessibility service
                     LogcatManager.addLog("Accessibility service not enabled - enable it in settings", "Settings")
                     wakeLockSwitch?.isChecked = false
                 } else {
                     if (!isEnabled) {
-                        com.qali.iris.EyeTrackingAccessibilityService.toggleWakeLock()
+                        EyeTrackingAccessibilityService.toggleWakeLock()
                     }
                     LogcatManager.addLog("Wake lock enabled - MediaPipe will continue processing", "Settings")
                 }
             } else {
-                com.qali.iris.EyeTrackingAccessibilityService.toggleWakeLock()
+                EyeTrackingAccessibilityService.toggleWakeLock()
                 LogcatManager.addLog("Wake lock disabled - MediaPipe may pause when device sleeps", "Settings")
             }
         }
@@ -672,7 +673,7 @@ class SettingsFragment : Fragment() {
         screenOffSwitch?.setOnCheckedChangeListener { _, isChecked ->
             settingsManager.screenOffTracking = isChecked
             // Update wake lock based on new setting
-            com.qali.iris.EyeTrackingAccessibilityService.updateWakeLockFromSettings()
+            EyeTrackingAccessibilityService.updateWakeLockFromSettings()
             LogcatManager.addLog("Screen off tracking: ${if (isChecked) "enabled" else "disabled"}", "Settings")
         }
     }
@@ -1004,7 +1005,7 @@ class SettingsFragment : Fragment() {
                     try {
                         val action = Settings::class.java.getField("ACTION_ACCESSIBILITY_DETAILS_SETTINGS").get(null) as String
                         val intent = Intent(action).apply {
-                            data = android.net.Uri.parse("package:${requireContext().packageName}/${com.qali.iris.EyeTrackingAccessibilityService::class.java.name}")
+                            data = android.net.Uri.parse("package:${requireContext().packageName}/${EyeTrackingAccessibilityService::class.java.name}")
                         }
                         if (intent.resolveActivity(requireContext().packageManager) != null) {
                             startActivity(intent)
