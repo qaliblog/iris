@@ -13,6 +13,16 @@ class EyeBlinkDetector(
     private var blinkThreshold = initialBlinkThreshold
     private var halfBlinkAccelThreshold = initialHalfBlinkAccelThreshold
     private var clickDelayThreshold = initialClickDelayThreshold
+    
+    // Large positive and negative thresholds for click and drag
+    private var clickPositiveThreshold: Float = 0.5f
+    private var clickNegativeThreshold: Float = -0.5f
+    private var dragPositiveThreshold: Float = 0.3f
+    private var dragNegativeThreshold: Float = -0.3f
+    
+    // Enable/disable click and drag
+    private var clickEnabled: Boolean = true
+    private var dragEnabled: Boolean = true
 
     private data class State(val time: Long, val openness: Float, val velocity: Float = 0f, val acceleration: Float = 0f)
     private val history = ArrayDeque<State>(5)
@@ -28,6 +38,12 @@ class EyeBlinkDetector(
     fun setBlinkThreshold(t: Float) { blinkThreshold = t }
     fun setHalfBlinkAccelThreshold(t: Float) { halfBlinkAccelThreshold = t }
     fun setClickDelayThreshold(t: Long) { clickDelayThreshold = t }
+    fun setClickPositiveThreshold(t: Float) { clickPositiveThreshold = t }
+    fun setClickNegativeThreshold(t: Float) { clickNegativeThreshold = t }
+    fun setDragPositiveThreshold(t: Float) { dragPositiveThreshold = t }
+    fun setDragNegativeThreshold(t: Float) { dragNegativeThreshold = t }
+    fun setClickEnabled(enabled: Boolean) { clickEnabled = enabled }
+    fun setDragEnabled(enabled: Boolean) { dragEnabled = enabled }
 
     fun processEyelidLandmarks(upperLidY: Float, lowerLidY: Float, clickPosition: PointF) {
         val now = System.currentTimeMillis()
@@ -62,7 +78,11 @@ class EyeBlinkDetector(
             val closed = s2.openness < closeThreshold
             val reopened = s3.openness > reopenThreshold
 
-            if (closingAccel < -blinkThreshold && openingAccel > blinkThreshold * 0.6f && closed && reopened) {
+            // Use large positive and negative thresholds for click detection
+            val closingAccelThreshold = clickNegativeThreshold
+            val openingAccelThreshold = clickPositiveThreshold * 0.6f
+
+            if (clickEnabled && closingAccel < closingAccelThreshold && openingAccel > openingAccelThreshold && closed && reopened) {
                 lastActionTime = now
                 onTap?.invoke(clickPosition)
                 return
@@ -73,11 +93,15 @@ class EyeBlinkDetector(
             val s1 = history[history.size - 2]; val s2 = history[history.size - 1]
             val accelChange = abs(s2.acceleration - s1.acceleration)
 
-            if (!isHalfBlinking && accelChange >= halfBlinkAccelThreshold && s2.acceleration < -halfBlinkAccelThreshold * 0.8f) {
+            // Use large positive and negative thresholds for drag detection
+            val dragStartThreshold = dragNegativeThreshold
+            val dragEndPositiveThreshold = dragPositiveThreshold
+
+            if (dragEnabled && !isHalfBlinking && accelChange >= abs(dragStartThreshold) && s2.acceleration < dragStartThreshold) {
                 isHalfBlinking = true; lastActionTime = now; onDragStart?.invoke(clickPosition); return
             }
 
-            if (isHalfBlinking && (s2.acceleration > 0.05f || s2.openness > 0.7f)) {
+            if (isHalfBlinking && (s2.acceleration > dragEndPositiveThreshold || s2.openness > 0.7f)) {
                 isHalfBlinking = false; onDragEnd?.invoke()
             }
         }

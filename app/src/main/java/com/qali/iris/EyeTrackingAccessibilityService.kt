@@ -91,6 +91,19 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
         fun isOverlayVisible(): Boolean {
             return PointerOverlayService.getInstance()?.pointerView?.visibility == android.view.View.VISIBLE
         }
+        
+        /**
+         * Check if the accessibility service is enabled in system settings
+         */
+        fun isAccessibilityServiceEnabled(context: Context, service: Class<out AccessibilityService>): Boolean {
+            val accessibilityManager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
+                ?: return false
+            
+            val enabledServices = accessibilityManager.getEnabledAccessibilityServiceList(android.view.accessibility.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            val serviceName = android.content.ComponentName(context, service)
+            
+            return enabledServices.any { it.resolveInfo.serviceInfo.name == serviceName.className }
+        }
     }
     
     private var isServiceEnabled = false
@@ -134,8 +147,13 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
         instance = this
         isServiceEnabled = true
         
-        Log.d(TAG, "EyeTrackingAccessibilityService connected - Initializing camera and MediaPipe")
+        Log.d(TAG, "========================================")
+        Log.d(TAG, "Accessibility service connected")
+        Log.d(TAG, "========================================")
         LogcatManager.addLog("Accessibility service connected - Background tracking enabled", "Service")
+        
+        // Notify overlay service to resume
+        PointerOverlayService.resumeOverlay()
         
         // Get display metrics
         val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -178,23 +196,37 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             initialHalfBlinkAccelThreshold = settingsManager!!.halfBlinkAccelThreshold,
             initialClickDelayThreshold = settingsManager!!.clickDelayThreshold
         ).apply {
+            // Set initial thresholds from settings
+            setClickPositiveThreshold(settingsManager!!.clickPositiveThreshold)
+            setClickNegativeThreshold(settingsManager!!.clickNegativeThreshold)
+            setDragPositiveThreshold(settingsManager!!.dragPositiveThreshold)
+            setDragNegativeThreshold(settingsManager!!.dragNegativeThreshold)
+            setClickEnabled(settingsManager!!.clickEnabled)
+            setDragEnabled(settingsManager!!.dragEnabled)
+            
             onTap = { position ->
-                MouseControlService.performClick()
-                PointerOverlayService.indicateClick()
-                LogcatManager.addLog(
-                    "Service: Full blink detected at (${position.x.toInt()}, ${position.y.toInt()})",
-                    "Service"
-                )
+                if (settingsManager!!.clickEnabled) {
+                    MouseControlService.performClick()
+                    PointerOverlayService.indicateClick()
+                    LogcatManager.addLog(
+                        "Service: Full blink detected at (${position.x.toInt()}, ${position.y.toInt()})",
+                        "Service"
+                    )
+                }
             }
             onDragStart = {
-                MouseControlService.startDrag()
-                PointerOverlayService.indicateDragStart()
-                LogcatManager.addLog("Service: Half-blink → drag start", "Service")
+                if (settingsManager!!.dragEnabled) {
+                    MouseControlService.startDrag()
+                    PointerOverlayService.indicateDragStart()
+                    LogcatManager.addLog("Service: Half-blink → drag start", "Service")
+                }
             }
             onDragEnd = {
-                MouseControlService.endDrag()
-                PointerOverlayService.indicateDragEnd()
-                LogcatManager.addLog("Service: Half-blink → drag end", "Service")
+                if (settingsManager!!.dragEnabled) {
+                    MouseControlService.endDrag()
+                    PointerOverlayService.indicateDragEnd()
+                    LogcatManager.addLog("Service: Half-blink → drag end", "Service")
+                }
             }
         }
         
@@ -272,6 +304,12 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
                             eyeBlinkDetector?.setBlinkThreshold(settingsManager?.blinkThreshold ?: 0.3f)
                             eyeBlinkDetector?.setHalfBlinkAccelThreshold(settingsManager?.halfBlinkAccelThreshold ?: 0.15f)
                             eyeBlinkDetector?.setClickDelayThreshold(settingsManager?.clickDelayThreshold ?: 200L)
+                            eyeBlinkDetector?.setClickPositiveThreshold(settingsManager?.clickPositiveThreshold ?: 0.5f)
+                            eyeBlinkDetector?.setClickNegativeThreshold(settingsManager?.clickNegativeThreshold ?: -0.5f)
+                            eyeBlinkDetector?.setDragPositiveThreshold(settingsManager?.dragPositiveThreshold ?: 0.3f)
+                            eyeBlinkDetector?.setDragNegativeThreshold(settingsManager?.dragNegativeThreshold ?: -0.3f)
+                            eyeBlinkDetector?.setClickEnabled(settingsManager?.clickEnabled ?: true)
+                            eyeBlinkDetector?.setDragEnabled(settingsManager?.dragEnabled ?: true)
                             
                             // FORCE processing even if preview is hidden - this is critical for background tracking
                             // Run detectLiveStream() on a separate background thread to avoid blocking
@@ -426,8 +464,26 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
     override fun onInterrupt() {
         // Service was interrupted - log but don't stop camera processing
         // User may have temporarily disabled accessibility
+        Log.w(TAG, "========================================")
         Log.w(TAG, "Accessibility service interrupted")
+        Log.w(TAG, "========================================")
         LogcatManager.addLog("Accessibility service interrupted", "Service")
+        
+        // Pause overlay when service is interrupted
+        PointerOverlayService.pauseOverlay()
+    }
+    
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        Log.w(TAG, "========================================")
+        Log.w(TAG, "Accessibility service unbound")
+        Log.w(TAG, "========================================")
+        LogcatManager.addLog("Accessibility service unbound", "Service")
+        
+        // Pause overlay when service is unbound
+        PointerOverlayService.pauseOverlay()
+        
+        // Return true to allow rebinding
+        return true
     }
     
     // FaceLandmarkerHelper.LandmarkerListener implementation
@@ -469,6 +525,12 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             eyeBlinkDetector?.setBlinkThreshold(settingsManager?.blinkThreshold ?: 0.3f)
             eyeBlinkDetector?.setHalfBlinkAccelThreshold(settingsManager?.halfBlinkAccelThreshold ?: 0.15f)
             eyeBlinkDetector?.setClickDelayThreshold(settingsManager?.clickDelayThreshold ?: 200L)
+            eyeBlinkDetector?.setClickPositiveThreshold(settingsManager?.clickPositiveThreshold ?: 0.5f)
+            eyeBlinkDetector?.setClickNegativeThreshold(settingsManager?.clickNegativeThreshold ?: -0.5f)
+            eyeBlinkDetector?.setDragPositiveThreshold(settingsManager?.dragPositiveThreshold ?: 0.3f)
+            eyeBlinkDetector?.setDragNegativeThreshold(settingsManager?.dragNegativeThreshold ?: -0.3f)
+            eyeBlinkDetector?.setClickEnabled(settingsManager?.clickEnabled ?: true)
+            eyeBlinkDetector?.setDragEnabled(settingsManager?.dragEnabled ?: true)
             
             // Detect blink using eyelid landmarks (preferred) or fallback to eye area
             if (trackingResult.leftEyelidLandmarks != null || trackingResult.rightEyelidLandmarks != null) {
@@ -678,10 +740,15 @@ class EyeTrackingAccessibilityService : AccessibilityService(), FaceLandmarkerHe
             Log.w(TAG, "Error shutting down executor: ${e.message}")
         }
         
-        Log.d(TAG, "EyeTrackingAccessibilityService destroyed")
+        Log.d(TAG, "========================================")
+        Log.d(TAG, "Accessibility service destroyed")
+        Log.d(TAG, "========================================")
         LogcatManager.addLog("Accessibility service destroyed", "Service")
         
         isServiceEnabled = false
         instance = null
+        
+        // Pause overlay when service is destroyed
+        PointerOverlayService.pauseOverlay()
     }
 }

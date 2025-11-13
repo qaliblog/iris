@@ -30,8 +30,35 @@ class PointerOverlayService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_ID = "pointer_overlay_channel"
         private var instance: PointerOverlayService? = null
+        private var isPaused = false
         
         fun getInstance(): PointerOverlayService? = instance
+        
+        /**
+         * Pause overlay updates (e.g., when settings are open or service is disconnected)
+         */
+        fun pauseOverlay() {
+            Log.d(TAG, "========================================")
+            Log.d(TAG, "Overlay paused")
+            Log.d(TAG, "========================================")
+            isPaused = true
+            instance?.hidePointer()
+        }
+        
+        /**
+         * Resume overlay updates (e.g., when service connects or settings close)
+         */
+        fun resumeOverlay() {
+            Log.d(TAG, "========================================")
+            Log.d(TAG, "Overlay resumed")
+            Log.d(TAG, "========================================")
+            isPaused = false
+        }
+        
+        /**
+         * Check if overlay is paused
+         */
+        fun isPaused(): Boolean = isPaused
         
         /**
          * Check if the app is currently in the foreground
@@ -54,6 +81,11 @@ class PointerOverlayService : Service() {
         }
         
         fun updatePointerPosition(x: Float, y: Float) {
+            if (isPaused) {
+                Log.d(TAG, "updatePointerPosition: Overlay is paused, ignoring update")
+                return
+            }
+            
             instance?.let { service ->
                 Log.d(TAG, "updatePointerPosition called: x=$x, y=$y")
                 if (x < 0 || y < 0) {
@@ -257,6 +289,12 @@ class PointerOverlayService : Service() {
     
     fun updatePointer(x: Float, y: Float) {
         Log.d(TAG, "updatePointer() called: x=$x, y=$y")
+        
+        // Don't update if overlay is paused
+        if (Companion.isPaused()) {
+            Log.d(TAG, "updatePointer: Overlay is paused, skipping update")
+            return
+        }
         
         // Only update if valid coordinates (not -1)
         if (x < 0 || y < 0) {

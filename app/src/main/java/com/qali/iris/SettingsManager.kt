@@ -132,6 +132,56 @@ class SettingsManager(context: Context) {
         get() = prefs.getFloat(KEY_HEAD_DIRECTION_Y_MULTIPLIER, 1.0f)
         set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_Y_MULTIPLIER, value).apply()
     
+    // Head direction X positive threshold - minimum positive X direction to apply effect (default 0.01)
+    var headDirectionXPositiveThreshold: Float
+        get() = prefs.getFloat(KEY_HEAD_DIRECTION_X_POSITIVE_THRESHOLD, 0.01f)
+        set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_X_POSITIVE_THRESHOLD, value.coerceIn(0f, 1f)).apply()
+    
+    // Head direction X negative threshold - minimum negative X direction to apply effect (default -0.01)
+    var headDirectionXNegativeThreshold: Float
+        get() = prefs.getFloat(KEY_HEAD_DIRECTION_X_NEGATIVE_THRESHOLD, -0.01f)
+        set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_X_NEGATIVE_THRESHOLD, value.coerceIn(-1f, 0f)).apply()
+    
+    // Head direction Y positive threshold - minimum positive Y direction to apply effect (default 0.01)
+    var headDirectionYPositiveThreshold: Float
+        get() = prefs.getFloat(KEY_HEAD_DIRECTION_Y_POSITIVE_THRESHOLD, 0.01f)
+        set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_Y_POSITIVE_THRESHOLD, value.coerceIn(0f, 1f)).apply()
+    
+    // Head direction Y negative threshold - minimum negative Y direction to apply effect (default -0.01)
+    var headDirectionYNegativeThreshold: Float
+        get() = prefs.getFloat(KEY_HEAD_DIRECTION_Y_NEGATIVE_THRESHOLD, -0.01f)
+        set(value) = prefs.edit().putFloat(KEY_HEAD_DIRECTION_Y_NEGATIVE_THRESHOLD, value.coerceIn(-1f, 0f)).apply()
+    
+    // Enable click detection
+    var clickEnabled: Boolean
+        get() = prefs.getBoolean(KEY_CLICK_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_CLICK_ENABLED, value).apply()
+    
+    // Enable drag detection
+    var dragEnabled: Boolean
+        get() = prefs.getBoolean(KEY_DRAG_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_DRAG_ENABLED, value).apply()
+    
+    // Large positive threshold for click detection (default 0.5)
+    var clickPositiveThreshold: Float
+        get() = prefs.getFloat(KEY_CLICK_POSITIVE_THRESHOLD, 0.5f)
+        set(value) = prefs.edit().putFloat(KEY_CLICK_POSITIVE_THRESHOLD, value.coerceIn(0.1f, 2.0f)).apply()
+    
+    // Large negative threshold for click detection (default -0.5)
+    var clickNegativeThreshold: Float
+        get() = prefs.getFloat(KEY_CLICK_NEGATIVE_THRESHOLD, -0.5f)
+        set(value) = prefs.edit().putFloat(KEY_CLICK_NEGATIVE_THRESHOLD, value.coerceIn(-2.0f, -0.1f)).apply()
+    
+    // Large positive threshold for drag detection (default 0.3)
+    var dragPositiveThreshold: Float
+        get() = prefs.getFloat(KEY_DRAG_POSITIVE_THRESHOLD, 0.3f)
+        set(value) = prefs.edit().putFloat(KEY_DRAG_POSITIVE_THRESHOLD, value.coerceIn(0.1f, 2.0f)).apply()
+    
+    // Large negative threshold for drag detection (default -0.3)
+    var dragNegativeThreshold: Float
+        get() = prefs.getFloat(KEY_DRAG_NEGATIVE_THRESHOLD, -0.3f)
+        set(value) = prefs.edit().putFloat(KEY_DRAG_NEGATIVE_THRESHOLD, value.coerceIn(-2.0f, -0.1f)).apply()
+    
     companion object {
         private const val PREFS_NAME = "iris_settings"
         
@@ -159,5 +209,15 @@ class SettingsManager(context: Context) {
         private const val KEY_HEAD_DIRECTION_Y_THRESHOLD = "head_direction_y_threshold"
         private const val KEY_HEAD_DIRECTION_X_MULTIPLIER = "head_direction_x_multiplier"
         private const val KEY_HEAD_DIRECTION_Y_MULTIPLIER = "head_direction_y_multiplier"
+        private const val KEY_HEAD_DIRECTION_X_POSITIVE_THRESHOLD = "head_direction_x_positive_threshold"
+        private const val KEY_HEAD_DIRECTION_X_NEGATIVE_THRESHOLD = "head_direction_x_negative_threshold"
+        private const val KEY_HEAD_DIRECTION_Y_POSITIVE_THRESHOLD = "head_direction_y_positive_threshold"
+        private const val KEY_HEAD_DIRECTION_Y_NEGATIVE_THRESHOLD = "head_direction_y_negative_threshold"
+        private const val KEY_CLICK_ENABLED = "click_enabled"
+        private const val KEY_DRAG_ENABLED = "drag_enabled"
+        private const val KEY_CLICK_POSITIVE_THRESHOLD = "click_positive_threshold"
+        private const val KEY_CLICK_NEGATIVE_THRESHOLD = "click_negative_threshold"
+        private const val KEY_DRAG_POSITIVE_THRESHOLD = "drag_positive_threshold"
+        private const val KEY_DRAG_NEGATIVE_THRESHOLD = "drag_negative_threshold"
     }
 }

@@ -37,23 +37,38 @@ class TrackingCalculator(private val settings: SettingsManager, private val disp
         var finalMovementX = adjustedMovementX * distanceXRange
         var finalMovementY = adjustedMovementY * distanceYRange
         
-        // Apply head direction effect with thresholds
+        // Apply head direction effect with positive and negative thresholds
         result.headDirection?.let { headDir ->
             // Get head direction components (-1 to 1)
             val headDirX = headDir.directionX
             val headDirY = headDir.directionY
             
-            // Apply thresholds - only apply head direction if it exceeds threshold
-            val headDirXEffect = if (kotlin.math.abs(headDirX) >= settings.headDirectionXThreshold) {
-                headDirX * settings.headDirectionXMultiplier
-            } else {
-                0f // Below threshold, no effect
+            // Apply X thresholds - check positive and negative separately
+            val headDirXEffect = when {
+                // Positive direction: must exceed positive threshold
+                headDirX > 0 && headDirX >= settings.headDirectionXPositiveThreshold -> {
+                    headDirX * settings.headDirectionXMultiplier
+                }
+                // Negative direction: must be below negative threshold (more negative)
+                headDirX < 0 && headDirX <= settings.headDirectionXNegativeThreshold -> {
+                    headDirX * settings.headDirectionXMultiplier
+                }
+                // Below threshold in either direction, no effect
+                else -> 0f
             }
             
-            val headDirYEffect = if (kotlin.math.abs(headDirY) >= settings.headDirectionYThreshold) {
-                headDirY * settings.headDirectionYMultiplier
-            } else {
-                0f // Below threshold, no effect
+            // Apply Y thresholds - check positive and negative separately
+            val headDirYEffect = when {
+                // Positive direction: must exceed positive threshold
+                headDirY > 0 && headDirY >= settings.headDirectionYPositiveThreshold -> {
+                    headDirY * settings.headDirectionYMultiplier
+                }
+                // Negative direction: must be below negative threshold (more negative)
+                headDirY < 0 && headDirY <= settings.headDirectionYNegativeThreshold -> {
+                    headDirY * settings.headDirectionYMultiplier
+                }
+                // Below threshold in either direction, no effect
+                else -> 0f
             }
             
             // Apply head direction effect to movement

@@ -37,11 +37,37 @@ class MainActivity : AppCompatActivity() {
         // Keep screen on to prevent activity suspension
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         
+        // Request battery optimization whitelist to prevent system from killing the service
+        requestBatteryOptimizationWhitelist()
+        
         // Camera and MediaPipe are now handled by EyeTrackingAccessibilityService
         // No need to start a separate foreground service - accessibility service handles everything
         
         activityMainBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(activityMainBinding.root)
+    }
+    
+    /**
+     * Request battery optimization whitelist to prevent system from killing the service
+     */
+    private fun requestBatteryOptimizationWhitelist() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+            val packageName = packageName
+            
+            if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = android.net.Uri.parse("package:$packageName")
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(intent)
+                    android.util.Log.d("MainActivity", "Requested battery optimization whitelist")
+                } catch (e: Exception) {
+                    android.util.Log.w("MainActivity", "Could not request battery optimization whitelist: ${e.message}")
+                }
+            }
+        }
     }
     
     override fun onResume() {

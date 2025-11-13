@@ -157,7 +157,11 @@ class SettingsFragment : Fragment() {
 
         // Disable cursor movement when settings are visible
         CameraFragment.setCursorMovementEnabled(false)
-        PointerOverlayService.updatePointerPosition(-1f, -1f)
+        // Pause overlay when settings are open
+        PointerOverlayService.pauseOverlay()
+        android.util.Log.d("SettingsFragment", "========================================")
+        android.util.Log.d("SettingsFragment", "Settings opened - overlay paused")
+        android.util.Log.d("SettingsFragment", "========================================")
         LogcatManager.addLog("Settings opened to cursor DISABLED", "Settings")
 
         // Update wake lock toggle state in case it changed
@@ -198,6 +202,13 @@ class SettingsFragment : Fragment() {
 
         // Re-enable cursor movement when settings are closed
         CameraFragment.setCursorMovementEnabled(true)
+        // Resume overlay when settings are closed (only if accessibility service is connected)
+        if (EyeTrackingAccessibilityService.isEnabled()) {
+            PointerOverlayService.resumeOverlay()
+            android.util.Log.d("SettingsFragment", "========================================")
+            android.util.Log.d("SettingsFragment", "Settings closed - overlay resumed")
+            android.util.Log.d("SettingsFragment", "========================================")
+        }
         LogcatManager.addLog("Settings closed to cursor ENABLED", "Settings")
 
         // Unregister logcat listener

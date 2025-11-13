@@ -177,7 +177,8 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         val normalizedDirectionY = directionY / magnitude
         
         // Extend the line forward (multiply by a factor to extend beyond landmark 168)
-        val extensionFactor = 2.0f // Extend 2x the distance to landmark 168
+        // Lengthened to 5x the distance for better visualization
+        val extensionFactor = 5.0f // Extend 5x the distance to landmark 168
         val extendedX = weightedX + normalizedDirectionX * magnitude * extensionFactor
         val extendedY = weightedY + normalizedDirectionY * magnitude * extensionFactor
         
